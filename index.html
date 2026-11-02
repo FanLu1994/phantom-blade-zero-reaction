@@ -307,7 +307,9 @@
     switchBaseCd: 3000, switchExtraCd: 7000,
     lateWindow: 300, earlyWindow: 700,
     hitRecover: 120, strikeMs: 150,
+    parryWindow: 300,
     parryEnemySha: { normal: 12, blue: 35, black: 10 },
+    blockEnemySha: { normal: 8, blue: 15 },
     parryBlackSelfSha: 30,
     perfectDodgeEnemySha: 20,
   };
@@ -713,12 +715,12 @@
       <h1 class="title">影之刃零<span class="seal">反应练习</span></h1>
       <div class="subtitle">蓝 挡 · 红 闪 · 黑 避</div>
       <div class="cards">
-        <div class="card" style="--c:#3fa9ff"><b>蓝光</b>可格挡。命中瞬间点按格挡为完美弹反，回满杀气并触发鬼步</div>
-        <div class="card" style="--c:#ff4a4a"><b>红光</b>不可格挡。命中瞬间闪避为完美闪避，触发鬼步</div>
-        <div class="card" style="--c:#b48cff"><b>黑光</b>可弹反，但会大量消耗自身杀气，建议闪避</div>
-        <div class="card" style="--c:#e8e8e8"><b>普通</b>按住格挡进入架势自动挡下，期间杀气持续流失</div>
+        <div class="card" style="--c:#3fa9ff"><b>蓝光</b>命中前点按格挡即可挡下；命中瞬间点按为完美弹反，回满杀气并触发鬼步</div>
+        <div class="card" style="--c:#ff4a4a"><b>红光</b>不可格挡。命中前闪避为完美闪避；命中瞬间闪避触发鬼步</div>
+        <div class="card" style="--c:#b48cff"><b>黑光</b>可格挡，但会大量消耗自身杀气，建议闪避</div>
+        <div class="card" style="--c:#e8e8e8"><b>普通</b>命中前点按格挡即可挡下；一直按住为架势，杀气持续流失</div>
       </div>
-      <div class="notes">距上次格挡不足 0.4 秒再按，弹反窗口缩至 1/3，第三次起无完美窗口<br>
+      <div class="notes">普通格挡只在按住期间生效，按下后要保持到命中　·　距上次格挡不足 0.4 秒再按，完美窗口缩至 1/3，第三次起不判定为格挡<br>
         敌人杀气清空即破防，可处决　·　切换武器回满杀气，杀气越低冷却越长</div>
       ${diffsHtml()}
       <div class="hint">点击难度开始 · Enter 以选中难度开始 · 手柄十字键左右选择、✕ 开始</div>`;
@@ -832,7 +834,7 @@
     const chain = prev && t - prev.t < CFG.spamGap ? prev.chain + 1 : 1;
     const W0 = perfectWindow();
     const win = chain === 1 ? W0 : chain === 2 ? W0 / 3 : 0;
-    player.parryPresses.push({ t, chain, window: win });
+    player.parryPresses.push({ t, chain, window: win, parry: chain >= 3 ? 0 : CFG.parryWindow });
     if (player.parryPresses.length > 12) player.parryPresses.shift();
     checkLate(t, '格挡');
   }
@@ -1140,12 +1142,16 @@
       if (hit.type === 'red' && t - d.t <= W0) {
         d.invuln = CFG.perfectDodgeInvuln;
         rec.grade = 'perfect';
-        rec.result = '完美闪避 · 鬼步';
+        rec.result = '鬼步闪避';
         damageEnemySha(CFG.perfectDodgeEnemySha, t);
         hitStop(50);
         flashScreen('255,255,255', 0.22, 150);
         addRing(PLAYER_X, GROUND_Y - 110, ATTACK.red.rgb, 10, 130, 320, 3);
         ghostStep(t);
+      } else if (hit.type === 'red') {
+        d.invuln = CFG.perfectDodgeInvuln;
+        rec.grade = 'ok';
+        rec.result = '完美闪避（命中瞬间闪避可触发鬼步）';
       } else {
         rec.grade = 'ok';
         rec.result = hit.type === 'blue' ? '闪避（蓝光可弹反）' : '闪避成功';
@@ -1178,6 +1184,31 @@
         Sfx.block();
         hitStop(60);
         spawnSparks(CLASH.x, CLASH.y, '#b48cff', 22, 1);
+      }
+    } else if (!broken && p && t - p.t <= p.parry && guardHeld(t)) {
+      rec.offset = t - p.t;
+      rec.reaction = p.t - hit.flashAt;
+      const shortened = p.chain === 2 && t - p.t <= W0 ? '（连按致完美窗口缩短）' : '';
+      if (hit.type === 'red') {
+        rec.result = '按错：红光不可格挡';
+        damagePlayer(A.dmg, t);
+      } else if (hit.type === 'black') {
+        rec.grade = 'ok';
+        rec.result = '格挡黑光 · 杀气大损';
+        bannerColor = '#b48cff';
+        damageEnemySha(CFG.parryEnemySha.black, t);
+        changePlayerSha(-CFG.parryBlackSelfSha * mul, t);
+        Sfx.block();
+        hitStop(60);
+        spawnSparks(CLASH.x, CLASH.y, '#b48cff', 22, 1);
+      } else {
+        rec.grade = 'ok';
+        rec.result = (hit.type === 'blue' ? '格挡蓝光（命中瞬间按可完美弹反）' : '格挡') + shortened;
+        damageEnemySha(CFG.blockEnemySha[hit.type], t);
+        Sfx.block();
+        hitStop(45);
+        spawnSparks(CLASH.x, CLASH.y, '#ffffff', 16, 1);
+        shakeScreen(3, 120);
       }
     } else if (!broken && guardHeld(t)) {
       if (hit.type === 'red') {
@@ -1218,9 +1249,13 @@
         } else if (cand === p && hit.type === 'red') {
           rec.result = '按错：红光不可格挡';
           rec.offset = t - p.t;
-        } else if (cand === p && p.window < W0 && t - p.t <= W0) {
-          rec.result = p.window === 0 ? '连按惩罚：无弹反窗口' : '连按惩罚：弹反窗口缩短';
+        } else if (cand === p && p.chain >= 3 && t - p.t <= CFG.parryWindow) {
+          rec.result = '连按：不判定为格挡';
           rec.offset = t - p.t;
+        } else if (cand === p && t - p.t <= CFG.parryWindow) {
+          rec.result = '格挡键松开过早';
+          rec.offset = t - p.t;
+          rec.reaction = p.t - hit.flashAt;
         } else {
           rec.result = cand === p ? '格挡过早' : '闪避过早';
           rec.offset = t - cand.t;
@@ -1230,7 +1265,7 @@
     }
 
     if (!bannerColor) bannerColor = { perfect: '#ffcf5a', ok: '#bfe3b4', fail: '#ff6a6a' }[rec.grade];
-    let sub = rec.offset != null ? `${offsetText(rec.offset)} · 窗口 ${Math.round(W0)}ms` : '';
+    let sub = rec.offset != null ? `${offsetText(rec.offset)} · 完美窗口 ${Math.round(W0)}ms` : '';
     if (!enemyWasBroken && enemy.mode === 'broken') sub = '敌人破防 · 按 E 处决';
     if (state === 'play') setBanner(rec.result, bannerColor, sub);
     records.push(rec);
