@@ -1,0 +1,2250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>影之刃零 · 反应练习模拟器</title>
+<style>
+  :root {
+    --gold: #d9a64a;
+    --paper: #ece4d4;
+    --muted: #8d877e;
+    --line: #2a2a30;
+    --seal: #b3121b;
+    --kai: "STKaiti", "KaiTi", "楷体", serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 50% 0%, #1c1c22 0%, #09090b 70%);
+    color: #d8d4cc;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    user-select: none;
+  }
+  #app {
+    display: flex;
+    gap: 18px;
+    padding: 18px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  #stage {
+    position: relative;
+    width: 960px;
+    max-width: calc(100vw - 400px);
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px #2c2c33, 0 24px 70px rgba(0, 0, 0, 0.7);
+  }
+  #game { width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+  #overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 960px;
+    height: 540px;
+    transform-origin: 0 0;
+    transform: scale(var(--s, 1));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 28px;
+    text-align: center;
+    background: radial-gradient(ellipse at center, rgba(14, 14, 18, 0.82), rgba(4, 4, 6, 0.96));
+  }
+  #overlay.hidden { display: none; }
+  .title {
+    margin: 0;
+    font-family: var(--kai);
+    font-size: 68px;
+    font-weight: normal;
+    letter-spacing: 16px;
+    line-height: 1;
+    color: var(--paper);
+    text-shadow: 0 0 30px rgba(190, 30, 30, 0.35);
+  }
+  .seal {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 6px 4px;
+    border: 2px solid var(--seal);
+    color: #d42a2a;
+    font-size: 16px;
+    letter-spacing: 3px;
+    writing-mode: vertical-rl;
+    vertical-align: middle;
+    transform: translateY(-8px) rotate(3deg);
+  }
+  .subtitle { font-family: var(--kai); font-size: 19px; letter-spacing: 8px; color: #a9a39a; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 840px; }
+  .card {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid #2e2e36;
+    border-top: 3px solid var(--c);
+    text-align: left;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #b4ada3;
+  }
+  .card b { display: block; margin-bottom: 2px; font-family: var(--kai); font-size: 20px; font-weight: normal; color: var(--c); }
+  .notes { font-size: 12px; line-height: 1.8; color: #7d776f; }
+  .diffs { display: flex; gap: 10px; }
+  .diffs button {
+    min-width: 150px;
+    padding: 12px 14px;
+    background: linear-gradient(#1c1c22, #141418);
+    border: 1px solid #3a3a44;
+    color: var(--paper);
+    font-family: var(--kai);
+    font-size: 21px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .diffs button small {
+    display: block;
+    margin-top: 4px;
+    font-family: "Microsoft YaHei", sans-serif;
+    font-size: 11.5px;
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+  .diffs button.sel, .diffs button:hover { border-color: var(--gold); color: #ffd27a; transform: translateY(-2px); }
+  .hint { font-size: 12px; color: #6f6a63; }
+  .result-title { margin: 0; font-family: var(--kai); font-size: 96px; font-weight: normal; line-height: 1; }
+  .result-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .stat { min-width: 140px; padding: 10px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid #2e2e36; }
+  .stat .v { font-family: var(--kai); font-size: 30px; color: var(--paper); }
+  .stat .k { font-size: 12px; color: var(--muted); }
+
+  aside { width: 350px; display: flex; flex-direction: column; gap: 12px; }
+  .panel { padding: 12px 14px; background: linear-gradient(#16161b, #111114); border: 1px solid var(--line); }
+  .panel h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    font-family: var(--kai);
+    font-size: 18px;
+    font-weight: normal;
+    letter-spacing: 4px;
+    color: var(--paper);
+  }
+  .panel h3::before { content: ''; width: 4px; height: 15px; background: var(--seal); }
+  .sound { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .sound input { flex: 1; accent-color: var(--gold); }
+  .sound button {
+    padding: 4px 10px;
+    background: #1d1d23;
+    border: 1px solid #3a3a44;
+    color: var(--paper);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .sound button.on { border-color: var(--seal); color: #ff7a7a; }
+  .typeRow { display: grid; grid-template-columns: 38px 1fr 70px; gap: 8px; align-items: center; margin: 7px 0; font-size: 13px; }
+  .typeRow .nums { text-align: right; color: #a9a39a; font-variant-numeric: tabular-nums; }
+  .stack { display: flex; height: 8px; background: #24242a; overflow: hidden; }
+  .stack i { display: block; height: 100%; }
+  .stack .p { background: #ffcf5a; }
+  .stack .o { background: #7fc77a; }
+  .stack .f { background: #d9534f; }
+  .legend { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 4px; background: var(--c); }
+  #statsExtra { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  #statsExtra div { padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid #24242a; }
+  #statsExtra b { display: block; font-family: var(--kai); font-size: 20px; font-weight: normal; color: var(--paper); }
+  #statsExtra small { font-size: 11px; color: var(--muted); }
+  #log { margin: 0; padding: 0; list-style: none; max-height: 250px; overflow-y: auto; font-size: 12px; line-height: 1.5; }
+  #log li { padding: 4px 0 4px 8px; margin-bottom: 3px; border-left: 3px solid var(--c); background: rgba(255, 255, 255, 0.02); }
+  #log .perfect .r { color: #ffcf5a; }
+  #log .ok .r { color: #9fd89a; }
+  #log .fail .r { color: #ff7a7a; }
+  #log .m { color: #7d776f; }
+  #keys { font-size: 12px; line-height: 1.9; color: #9a948b; }
+  kbd {
+    padding: 0 5px;
+    background: #222228;
+    border: 1px solid #3a3a44;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    color: #e8dfd2;
+    font-family: inherit;
+  }
+  @media (max-width: 1100px) {
+    #app { flex-direction: column; align-items: center; }
+    #stage { max-width: calc(100vw - 36px); }
+    aside { width: min(960px, calc(100vw - 36px)); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="overlay"></div>
+  </div>
+  <aside>
+    <section class="panel">
+      <h3>声音</h3>
+      <div class="sound">
+        <span>音量</span>
+        <input type="range" id="vol" min="0" max="100" value="70">
+        <button id="mute">静音</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>本局统计</h3>
+      <div id="statsBody"></div>
+      <div class="legend">
+        <span style="--c:#ffcf5a">完美</span><span style="--c:#7fc77a">成功</span><span style="--c:#d9534f">失误</span>
+      </div>
+      <div id="statsExtra"></div>
+    </section>
+    <section class="panel">
+      <h3>判定记录</h3>
+      <ol id="log"></ol>
+    </section>
+    <section class="panel" id="keys">
+      <h3>按键</h3>
+      格挡 / 弹反：<kbd>鼠标右键</kbd> 点按弹反，按住架势　手柄 <kbd>L1</kbd><br>
+      闪避：<kbd>左 Shift</kbd>　手柄 <kbd>R1</kbd><br>
+      轻攻击：<kbd>鼠标左键</kbd>　手柄 <kbd>□</kbd><br>
+      重攻击（耗 20 杀气）：<kbd>F</kbd>　手柄 <kbd>△</kbd><br>
+      处决：<kbd>E</kbd>　手柄 <kbd>○</kbd><br>
+      切换武器：<kbd>1</kbd>　手柄 <kbd>十字键左</kbd><br>
+      暂停：<kbd>Esc</kbd>　手柄 <kbd>Options</kbd>
+    </section>
+  </aside>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 960, H = 540, TAU = Math.PI * 2;
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const KAI = '"STKaiti","KaiTi","楷体",serif';
+  const UI = '"Microsoft YaHei","PingFang SC",sans-serif';
+
+  const DIFFICULTIES = [
+    { name: '入阵者', frames: 10, guardMul: 0.33 },
+    { name: '破局者', frames: 8, guardMul: 0.66 },
+    { name: '逆天者', frames: 8, guardMul: 1 },
+    { name: '六十六天', frames: 6, guardMul: 1 },
+  ];
+  const FRAME_MS = 1000 / 60;
+
+  const ATTACK = {
+    normal: { name: '普通', color: '#e8e8e8', rgb: '235,235,235', dmg: 8, guardCost: 10 },
+    blue: { name: '蓝光', color: '#3fa9ff', rgb: '70,170,255', dmg: 15, guardCost: 30 },
+    red: { name: '红光', color: '#ff3b3b', rgb: '255,60,60', dmg: 25, guardCost: 10 },
+    black: { name: '黑光', color: '#b48cff', rgb: '160,110,240', dmg: 18, guardCost: 45 },
+  };
+
+  // 每段：[攻击类型, 从出招提示到命中的毫秒数]
+  const COMBOS = [
+    [['normal', 520], ['normal', 420], ['blue', 700]],
+    [['red', 750]],
+    [['blue', 1150]],
+    [['normal', 450], ['red', 650]],
+    [['black', 800]],
+    [['blue', 550], ['blue', 480], ['red', 700]],
+    [['normal', 340], ['normal', 320], ['normal', 320], ['normal', 340]],
+    [['red', 600], ['blue', 900]],
+    [['normal', 480], ['black', 700], ['blue', 600]],
+    [['blue', 420], ['normal', 380], ['blue', 950]],
+    [['red', 1000]],
+  ];
+
+  // 敌人各类攻击的动作：普通横斩、蓝光举刀重劈、红光蓄势突刺、黑光跃起砸地
+  const MOVES = {
+    normal: { raise: 120, end: -25, lunge: 55, crouch: 0.3, pull: 0, thrust: 0, leanUp: -4, leanDown: 14, jump: 0 },
+    blue: { raise: 172, end: -50, lunge: 80, crouch: 0.55, pull: 0, thrust: 0, leanUp: -10, leanDown: 20, jump: 0 },
+    red: { raise: 6, end: -2, lunge: 140, crouch: 0.75, pull: -34, thrust: 26, leanUp: -6, leanDown: 26, jump: 0 },
+    black: { raise: 178, end: -75, lunge: 100, crouch: 0.6, pull: 0, thrust: 0, leanUp: -12, leanDown: 24, jump: 55 },
+  };
+
+  const CFG = {
+    playerHP: 100, playerSha: 100,
+    enemyHP: 300, enemySha: 100,
+    guardDrainPerSec: 6,
+    dodgeInvuln: 250, perfectDodgeInvuln: 600, dodgeLock: 400,
+    spamGap: 400,
+    ghostStagger: 1000,
+    playerBreakMs: 1500, playerBreakRecoverSha: 30, brokenDmgMul: 1.5,
+    enemyBreakMs: 4000,
+    light: { lock: 280, dmg: 5, shaDmg: 3, blockedShaDmg: 6, gain: 4 },
+    heavy: { lock: 550, cost: 20, dmg: 14, shaDmg: 10, blockedShaDmg: 22, blockedDmg: 3 },
+    execDmg: 40, execLock: 900,
+    switchBaseCd: 3000, switchExtraCd: 7000,
+    lateWindow: 300, earlyWindow: 700,
+    hitRecover: 120, strikeMs: 150,
+    parryEnemySha: { normal: 12, blue: 35, black: 10 },
+    parryBlackSelfSha: 30,
+    perfectDodgeEnemySha: 20,
+  };
+
+  const PLAYER_X = 360, ENEMY_X = 600, GROUND_Y = 430, BEHIND_X = ENEMY_X + 130;
+  const CLASH = { x: PLAYER_X + 62, y: GROUND_Y - 150 };
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const easeOut = k => 1 - Math.pow(1 - k, 3);
+  const easeInOut = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+
+  // ---------- 音效（Web Audio 合成） ----------
+  const Sfx = (() => {
+    let ac = null, master, sfx, bgm, verb, noiseBuf, distCurve;
+    let volume = 0.7, muted = false;
+    let bgmNodes = null, bgmTimer = null, nextBeat = 0, step = 0;
+    const DRUMS = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 2, 2, 0];
+
+    function init() {
+      if (ac) {
+        if (ac.state === 'suspended') ac.resume();
+        return;
+      }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ac = new AC();
+      const comp = ac.createDynamicsCompressor();
+      comp.threshold.value = -12;
+      comp.knee.value = 10;
+      comp.ratio.value = 5;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.2;
+      master = ac.createGain();
+      master.gain.value = muted ? 0 : volume;
+      comp.connect(master);
+      master.connect(ac.destination);
+      sfx = ac.createGain();
+      sfx.connect(comp);
+      bgm = ac.createGain();
+      bgm.gain.value = 0;
+      bgm.connect(comp);
+      const conv = ac.createConvolver();
+      conv.buffer = impulse(2.2, 2.5);
+      verb = ac.createGain();
+      verb.gain.value = 0.35;
+      verb.connect(conv);
+      conv.connect(comp);
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+      const nd = noiseBuf.getChannelData(0);
+      for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      distCurve = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) {
+        const x = i * 2 / 1024 - 1;
+        distCurve[i] = (1 + 30) * x / (1 + 30 * Math.abs(x));
+      }
+    }
+
+    function impulse(sec, decay) {
+      const len = Math.floor(ac.sampleRate * sec);
+      const b = ac.createBuffer(2, len, ac.sampleRate);
+      for (let c = 0; c < 2; c++) {
+        const d = b.getChannelData(c);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+      return b;
+    }
+
+    function route(node, wet, dest) {
+      if (dest) { node.connect(dest); return; }
+      node.connect(sfx);
+      if (wet > 0) {
+        const g = ac.createGain();
+        g.gain.value = wet;
+        node.connect(g);
+        g.connect(verb);
+      }
+    }
+
+    function envGain(at, attack, peak, dur) {
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(peak, at + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      return g;
+    }
+
+    function tone({ type = 'sine', f, f2, t = 0, dur = 0.2, gain = 0.3, attack = 0.004, wet = 0, dist = false, filter = null, dest = null }) {
+      const at = ac.currentTime + Math.max(0, t);
+      const o = ac.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(f, at);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, at + dur);
+      let n = o;
+      if (dist) {
+        const ws = ac.createWaveShaper();
+        ws.curve = distCurve;
+        n.connect(ws);
+        n = ws;
+      }
+      if (filter) {
+        const bq = ac.createBiquadFilter();
+        bq.type = filter.type;
+        bq.frequency.value = filter.f;
+        if (filter.Q) bq.Q.value = filter.Q;
+        n.connect(bq);
+        n = bq;
+      }
+      const g = envGain(at, attack, gain, dur);
+      n.connect(g);
+      route(g, wet, dest);
+      o.start(at);
+      o.stop(at + dur + 0.05);
+    }
+
+    function noise({ t = 0, dur = 0.2, gain = 0.3, attack = 0.004, type = 'bandpass', f = 1000, f2, Q = 1, wet = 0, dest = null }) {
+      const at = ac.currentTime + Math.max(0, t);
+      const s = ac.createBufferSource();
+      s.buffer = noiseBuf;
+      const bq = ac.createBiquadFilter();
+      bq.type = type;
+      bq.frequency.setValueAtTime(f, at);
+      if (f2) bq.frequency.exponentialRampToValueAtTime(f2, at + dur);
+      bq.Q.value = Q;
+      const g = envGain(at, attack, gain, dur);
+      s.connect(bq);
+      bq.connect(g);
+      route(g, wet, dest);
+      s.start(at, Math.random() * 1.5);
+      s.stop(at + dur + 0.05);
+    }
+
+    function metal(freqs, { t = 0, dur = 0.6, gain = 0.2, wet = 0.3 } = {}) {
+      freqs.forEach((f, i) => tone({ f, t, dur: dur * (1 - i * 0.1), gain: gain / (1 + i * 0.5), attack: 0.002, wet }));
+    }
+
+    const play = fn => (...args) => { if (ac) fn(...args); };
+
+    function drum(kind, when) {
+      const t = when - ac.currentTime;
+      if (kind === 1) {
+        tone({ f: 95, f2: 42, t, dur: 0.5, gain: 0.32, dest: bgm });
+        noise({ t, dur: 0.08, gain: 0.12, type: 'lowpass', f: 300, dest: bgm });
+      } else {
+        tone({ f: 170, f2: 95, t, dur: 0.18, gain: 0.12, dest: bgm });
+      }
+    }
+
+    function schedule() {
+      const spb = 60 / 84 / 2;
+      while (nextBeat < ac.currentTime + 0.15) {
+        if (DRUMS[step]) drum(DRUMS[step], nextBeat);
+        nextBeat += spb;
+        step = (step + 1) % DRUMS.length;
+      }
+    }
+
+    return {
+      init,
+      setVolume(v) {
+        volume = v;
+        if (ac) master.gain.setTargetAtTime(muted ? 0 : volume, ac.currentTime, 0.05);
+      },
+      setMuted(m) {
+        muted = m;
+        if (ac) master.gain.setTargetAtTime(muted ? 0 : volume, ac.currentTime, 0.05);
+      },
+      startBgm: play(() => {
+        if (bgmNodes) return;
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 220;
+        lp.Q.value = 4;
+        const dg = ac.createGain();
+        dg.gain.value = 0.07;
+        lp.connect(dg);
+        dg.connect(bgm);
+        const oscs = [55, 55.3, 82.4].map(f => {
+          const o = ac.createOscillator();
+          o.type = 'sawtooth';
+          o.frequency.value = f;
+          o.connect(lp);
+          o.start();
+          return o;
+        });
+        const lfo = ac.createOscillator();
+        lfo.frequency.value = 0.07;
+        const lg = ac.createGain();
+        lg.gain.value = 120;
+        lfo.connect(lg);
+        lg.connect(lp.frequency);
+        lfo.start();
+        const wind = ac.createBufferSource();
+        wind.buffer = noiseBuf;
+        wind.loop = true;
+        const wbp = ac.createBiquadFilter();
+        wbp.type = 'bandpass';
+        wbp.frequency.value = 600;
+        wbp.Q.value = 0.8;
+        const wg = ac.createGain();
+        wg.gain.value = 0.035;
+        wind.connect(wbp);
+        wbp.connect(wg);
+        wg.connect(bgm);
+        const wl = ac.createOscillator();
+        wl.frequency.value = 0.13;
+        const wlg = ac.createGain();
+        wlg.gain.value = 350;
+        wl.connect(wlg);
+        wlg.connect(wbp.frequency);
+        wind.start();
+        wl.start();
+        bgmNodes = [...oscs, lfo, wind, wl];
+        bgm.gain.cancelScheduledValues(ac.currentTime);
+        bgm.gain.setTargetAtTime(0.55, ac.currentTime, 0.8);
+        nextBeat = ac.currentTime + 0.1;
+        step = 0;
+        bgmTimer = setInterval(schedule, 30);
+      }),
+      stopBgm: play(() => {
+        clearInterval(bgmTimer);
+        bgmTimer = null;
+        if (!bgmNodes) return;
+        const nodes = bgmNodes;
+        bgmNodes = null;
+        bgm.gain.cancelScheduledValues(ac.currentTime);
+        bgm.gain.setTargetAtTime(0, ac.currentTime, 0.3);
+        nodes.forEach(n => n.stop(ac.currentTime + 1.5));
+      }),
+      duckBgm: play(on => bgm.gain.setTargetAtTime(on ? 0.12 : 0.55, ac.currentTime, 0.2)),
+
+      cue: play(type => {
+        if (type === 'blue') {
+          metal([2349, 3520, 4699], { dur: 0.5, gain: 0.22, wet: 0.4 });
+          noise({ dur: 0.12, gain: 0.12, type: 'highpass', f: 7000 });
+        } else if (type === 'red') {
+          tone({ type: 'sawtooth', f: 440, f2: 880, dur: 0.32, gain: 0.16, dist: true, filter: { type: 'bandpass', f: 1400, Q: 2 }, wet: 0.3 });
+          tone({ type: 'square', f: 220, f2: 330, dur: 0.25, gain: 0.07 });
+          tone({ f: 120, f2: 40, dur: 0.45, gain: 0.5 });
+          noise({ dur: 0.3, gain: 0.18, f: 3000, f2: 600, Q: 3 });
+        } else if (type === 'black') {
+          tone({ type: 'sawtooth', f: 62, f2: 48, dur: 0.7, gain: 0.28, filter: { type: 'lowpass', f: 380, Q: 6 }, wet: 0.3 });
+          noise({ dur: 0.6, gain: 0.22, type: 'lowpass', f: 420, attack: 0.08 });
+          tone({ f: 40, dur: 0.6, gain: 0.4, attack: 0.05 });
+        }
+      }),
+      enemySwing: play(type => {
+        if (type === 'normal') noise({ dur: 0.16, gain: 0.22, f: 900, f2: 3200, Q: 1.4, attack: 0.06 });
+        else if (type === 'blue') noise({ dur: 0.2, gain: 0.3, f: 500, f2: 2200, Q: 1.2, attack: 0.08 });
+        else if (type === 'red') noise({ dur: 0.13, gain: 0.3, f: 2200, f2: 5200, Q: 2, attack: 0.04 });
+        else noise({ dur: 0.22, gain: 0.3, f: 300, f2: 1200, Q: 1, attack: 0.1 });
+      }),
+      parry: play(big => {
+        metal(big ? [1568, 2489, 3322, 4435, 5920] : [1760, 2794, 3729], { dur: big ? 1.1 : 0.6, gain: big ? 0.32 : 0.24, wet: 0.45 });
+        noise({ dur: 0.18, gain: 0.3, type: 'highpass', f: 4500 });
+        tone({ f: 180, f2: 90, dur: 0.15, gain: 0.35 });
+      }),
+      block: play(() => {
+        metal([620, 980, 1490], { dur: 0.28, gain: 0.2, wet: 0.2 });
+        noise({ dur: 0.07, gain: 0.25, f: 2400, Q: 1.5 });
+        tone({ f: 140, f2: 80, dur: 0.1, gain: 0.25 });
+      }),
+      dodge: play(() => noise({ dur: 0.2, gain: 0.2, f: 700, f2: 2000, Q: 1, attack: 0.05 })),
+      ghost: play(() => {
+        noise({ dur: 0.35, gain: 0.28, type: 'lowpass', f: 300, f2: 4000, attack: 0.3 });
+        tone({ f: 110, f2: 45, t: 0.05, dur: 0.4, gain: 0.4 });
+        metal([2637, 3951], { t: 0.02, dur: 0.6, gain: 0.06, wet: 0.6 });
+      }),
+      ghostReturn: play(() => noise({ dur: 0.18, gain: 0.15, type: 'lowpass', f: 2500, f2: 400 })),
+      hurt: play(() => {
+        tone({ f: 150, f2: 45, dur: 0.28, gain: 0.6 });
+        noise({ dur: 0.16, gain: 0.4, type: 'lowpass', f: 1200 });
+        noise({ dur: 0.08, gain: 0.25, f: 3500, Q: 2 });
+      }),
+      playerBreak: play(() => {
+        noise({ dur: 0.35, gain: 0.45, f: 1400, f2: 300, Q: 1.5 });
+        tone({ type: 'sawtooth', f: 320, f2: 60, dur: 0.55, gain: 0.15, filter: { type: 'lowpass', f: 1200 } });
+        metal([311, 466, 698], { dur: 0.5, gain: 0.15 });
+      }),
+      enemyBreak: play(() => {
+        metal([98, 147, 220, 293, 392], { dur: 2.4, gain: 0.38, wet: 0.5 });
+        tone({ f: 49, dur: 1.5, gain: 0.35, attack: 0.01 });
+      }),
+      slam: play(() => {
+        tone({ f: 80, f2: 32, dur: 0.55, gain: 0.7 });
+        noise({ dur: 0.35, gain: 0.35, type: 'lowpass', f: 600, f2: 120 });
+      }),
+      light: play(() => noise({ dur: 0.12, gain: 0.16, f: 1200, f2: 3800, Q: 1.6, attack: 0.03 })),
+      heavy: play(() => {
+        noise({ dur: 0.22, gain: 0.24, f: 500, f2: 2400, Q: 1.2, attack: 0.06 });
+        metal([2794, 4186], { dur: 0.25, gain: 0.05, wet: 0.4 });
+      }),
+      enemyGuard: play(() => {
+        metal([880, 1320, 2093], { dur: 0.2, gain: 0.14, wet: 0.2 });
+        noise({ dur: 0.05, gain: 0.18, f: 3000, Q: 2 });
+      }),
+      flesh: play(heavy => {
+        noise({ dur: 0.1, gain: heavy ? 0.4 : 0.28, f: 1600, f2: 700, Q: 1.5 });
+        tone({ f: 130, f2: 60, dur: 0.14, gain: heavy ? 0.45 : 0.3 });
+      }),
+      execute: play(() => {
+        noise({ dur: 0.3, gain: 0.35, f: 300, f2: 3500, Q: 1, attack: 0.12 });
+        tone({ f: 120, f2: 35, t: 0.12, dur: 0.6, gain: 0.8 });
+        noise({ t: 0.12, dur: 0.25, gain: 0.45, type: 'lowpass', f: 1500 });
+        metal([110, 165, 247], { t: 0.12, dur: 1.8, gain: 0.25, wet: 0.6 });
+      }),
+      switchW: play(() => {
+        tone({ type: 'triangle', f: 500, f2: 1500, dur: 0.22, gain: 0.08 });
+        metal([1976, 2960], { t: 0.15, dur: 0.45, gain: 0.14, wet: 0.4 });
+      }),
+      denied: play(() => tone({ type: 'square', f: 180, dur: 0.07, gain: 0.05 })),
+      win: play(() => {
+        metal([196, 294, 392, 587], { dur: 2.8, gain: 0.3, wet: 0.6 });
+        tone({ type: 'triangle', f: 392, t: 0.3, dur: 1.5, gain: 0.1, wet: 0.5 });
+        tone({ type: 'triangle', f: 587, t: 0.6, dur: 1.6, gain: 0.08, wet: 0.5 });
+      }),
+      lose: play(() => {
+        tone({ type: 'sawtooth', f: 110, f2: 55, dur: 2, gain: 0.15, filter: { type: 'lowpass', f: 500 }, wet: 0.5 });
+        metal([131, 156], { dur: 2.4, gain: 0.25, wet: 0.6 });
+      }),
+    };
+  })();
+
+  // ---------- 时钟（顿帧 / 慢动作 / 暂停） ----------
+  const clock = { real: performance.now(), game: 0, scale: 1 };
+  let timeFx = [];
+
+  function gameNow() {
+    return clock.game + (performance.now() - clock.real) * clock.scale;
+  }
+
+  function setScale(s) {
+    const r = performance.now();
+    clock.game += (r - clock.real) * clock.scale;
+    clock.real = r;
+    clock.scale = s;
+  }
+
+  function updateTimeScale() {
+    const r = performance.now();
+    timeFx = timeFx.filter(f => f.until > r);
+    let s = state === 'pause' ? 0 : 1;
+    for (const f of timeFx) s = Math.min(s, f.scale);
+    if (s !== clock.scale) setScale(s);
+  }
+
+  function hitStop(ms) {
+    timeFx.push({ until: performance.now() + ms, scale: 0 });
+    updateTimeScale();
+  }
+
+  function slowMo(ms, scale) {
+    timeFx.push({ until: performance.now() + ms, scale });
+    updateTimeScale();
+  }
+
+  // ---------- DOM ----------
+  const canvas = document.getElementById('game');
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('overlay');
+  const statsBody = document.getElementById('statsBody');
+  const statsExtra = document.getElementById('statsExtra');
+  const logEl = document.getElementById('log');
+  const volEl = document.getElementById('vol');
+  const muteEl = document.getElementById('mute');
+  const stageEl = document.getElementById('stage');
+  new ResizeObserver(() => overlay.style.setProperty('--s', stageEl.clientWidth / W)).observe(stageEl);
+
+  let state = 'menu';
+  let diffIdx = 0;
+  let diff = DIFFICULTIES[0];
+  let player = null, enemy = null, records = [];
+  let particles = [], rings = [], glints = [], texts = [], screenFlashes = [];
+  let trails = { player: [], enemy: [] };
+  let banner = null, cueFx = null, endInfo = null, enemyGeom = null;
+  const cam = { shakeMag: 0, shakeStart: 0, shakeDur: 1, zoom: 0, zoomStart: -1e9 };
+
+  const perfectWindow = () => diff.frames * FRAME_MS;
+
+  // ---------- 菜单与结算 ----------
+  function diffsHtml() {
+    return '<div class="diffs">' + DIFFICULTIES.map((d, i) =>
+      `<button data-i="${i}" class="${i === diffIdx ? 'sel' : ''}">${d.name}` +
+      `<small>弹反 ${d.frames} 帧 · ${Math.round(d.frames * FRAME_MS)}ms　架势杀气 ×${d.guardMul}</small></button>`
+    ).join('') + '</div>';
+  }
+
+  function bindDiffs() {
+    overlay.querySelectorAll('.diffs button').forEach(b => {
+      b.addEventListener('click', () => { diffIdx = Number(b.dataset.i); startGame(); });
+    });
+  }
+
+  function updateDiffSel() {
+    overlay.querySelectorAll('.diffs button').forEach(b => b.classList.toggle('sel', Number(b.dataset.i) === diffIdx));
+  }
+
+  function showMenu() {
+    overlay.innerHTML = `
+      <h1 class="title">影之刃零<span class="seal">反应练习</span></h1>
+      <div class="subtitle">蓝 挡 · 红 闪 · 黑 避</div>
+      <div class="cards">
+        <div class="card" style="--c:#3fa9ff"><b>蓝光</b>可格挡。命中瞬间点按格挡为完美弹反，回满杀气并触发鬼步</div>
+        <div class="card" style="--c:#ff4a4a"><b>红光</b>不可格挡。命中瞬间闪避为完美闪避，触发鬼步</div>
+        <div class="card" style="--c:#b48cff"><b>黑光</b>可弹反，但会大量消耗自身杀气，建议闪避</div>
+        <div class="card" style="--c:#e8e8e8"><b>普通</b>按住格挡进入架势自动挡下，期间杀气持续流失</div>
+      </div>
+      <div class="notes">距上次格挡不足 0.4 秒再按，弹反窗口缩至 1/3，第三次起无完美窗口<br>
+        敌人杀气清空即破防，可处决　·　切换武器回满杀气，杀气越低冷却越长</div>
+      ${diffsHtml()}
+      <div class="hint">点击难度开始 · Enter 以选中难度开始 · 手柄十字键左右选择、✕ 开始</div>`;
+    bindDiffs();
+    overlay.classList.remove('hidden');
+  }
+
+  function showResult(win) {
+    const s = summarize();
+    const pct = v => (s.total ? Math.round(v / s.total * 100) : 0) + '%';
+    overlay.innerHTML = `
+      <h1 class="result-title" style="color:${win ? '#ffd27a' : '#d9534f'}">${win ? '胜' : '败'}</h1>
+      <div class="subtitle">${diff.name} · 弹反窗口 ${Math.round(perfectWindow())}ms</div>
+      <div class="result-grid">
+        <div class="stat"><div class="v">${s.total}</div><div class="k">应对次数</div></div>
+        <div class="stat"><div class="v">${pct(s.perfect)}</div><div class="k">完美率</div></div>
+        <div class="stat"><div class="v">${pct(s.perfect + s.ok)}</div><div class="k">成功率</div></div>
+        <div class="stat"><div class="v">${s.avgReaction ?? '-'}<small>${s.avgReaction != null ? 'ms' : ''}</small></div><div class="k">平均反应时间</div></div>
+      </div>
+      <div class="notes">完美 ${s.perfect}　成功 ${s.ok}　失误 ${s.fail}　·　完美时平均提前量 ${s.avgOffset ?? '-'}ms</div>
+      ${diffsHtml()}
+      <div class="hint">选择难度再来一局 · Enter 以原难度重来</div>`;
+    bindDiffs();
+    overlay.classList.remove('hidden');
+  }
+
+  // ---------- 开局 / 结束 / 暂停 ----------
+  function startGame() {
+    Sfx.init();
+    diff = DIFFICULTIES[diffIdx];
+    timeFx = [];
+    updateTimeScale();
+    const now = gameNow();
+    player = {
+      hp: CFG.playerHP, hpLag: CFG.playerHP, sha: CFG.playerSha,
+      guardDown: false, guardDownAt: -1e9, guardUpAt: -1e9,
+      parryPresses: [], dodgePresses: [],
+      dodgeAt: -1e9, lockUntil: 0, attack: null,
+      brokenUntil: 0, broken: false,
+      switchReadyAt: 0, weapon: 0,
+      behind: false, behindUntil: 0, ghostAt: -1e9, hurtAt: -1e9,
+      pendingLate: null,
+    };
+    enemy = {
+      hp: CFG.enemyHP, hpLag: CFG.enemyHP, sha: CFG.enemySha,
+      mode: 'idle', nextAt: now + 1500,
+      combo: null, idx: 0, hit: null, lastMove: null,
+      staggerUntil: 0, brokenUntil: 0, lastImpactAt: -1e9,
+      guardUntil: 0, hurtAt: -1e9,
+    };
+    records = [];
+    particles = [];
+    rings = [];
+    glints = [];
+    texts = [];
+    screenFlashes = [];
+    trails = { player: [], enemy: [] };
+    banner = null;
+    cueFx = null;
+    endInfo = null;
+    renderSide();
+    overlay.classList.add('hidden');
+    state = 'play';
+    Sfx.startBgm();
+  }
+
+  function endGame(win) {
+    if (state !== 'play') return;
+    state = 'ending';
+    player.guardDown = false;
+    endInfo = { win, at: performance.now() + 1500 };
+    slowMo(1300, 0.3);
+    Sfx.stopBgm();
+    if (win) Sfx.win(); else Sfx.lose();
+    setBanner(win ? '敌 已 伏 诛' : '身 死 道 消', win ? '#ffd27a' : '#d9534f');
+  }
+
+  function togglePause() {
+    if (state === 'play') {
+      state = 'pause';
+      releaseGuard(gameNow());
+      Sfx.duckBgm(true);
+    } else if (state === 'pause') {
+      state = 'play';
+      Sfx.duckBgm(false);
+    }
+    updateTimeScale();
+  }
+
+  // ---------- 玩家输入 ----------
+  const isBroken = t => t < player.brokenUntil;
+  const isDodging = t => t - player.dodgeAt < CFG.dodgeLock;
+  const canAct = t => state === 'play' && t >= player.lockUntil && !isBroken(t) && !isDodging(t);
+
+  function playerAnchor(t) {
+    const behind = t < player.behindUntil;
+    return { x: behind ? BEHIND_X : PLAYER_X, f: behind ? -1 : 1 };
+  }
+
+  function guardHeld(t) {
+    if (isBroken(t) || t < player.lockUntil) return false;
+    return player.guardDownAt <= t && (player.guardDown || player.guardUpAt > t);
+  }
+
+  function pressGuard(t) {
+    if (state !== 'play' || player.guardDown) return;
+    player.guardDown = true;
+    player.guardDownAt = t;
+    if (!canAct(t)) return;
+    const prev = player.parryPresses[player.parryPresses.length - 1];
+    const chain = prev && t - prev.t < CFG.spamGap ? prev.chain + 1 : 1;
+    const W0 = perfectWindow();
+    const win = chain === 1 ? W0 : chain === 2 ? W0 / 3 : 0;
+    player.parryPresses.push({ t, chain, window: win });
+    if (player.parryPresses.length > 12) player.parryPresses.shift();
+    checkLate(t, '格挡');
+  }
+
+  function releaseGuard(t) {
+    if (!player || !player.guardDown) return;
+    player.guardDown = false;
+    player.guardUpAt = t;
+  }
+
+  function pressDodge(t) {
+    if (state !== 'play' || isBroken(t) || isDodging(t)) return;
+    player.dodgeAt = t;
+    player.lockUntil = Math.min(player.lockUntil, t);
+    player.attack = null;
+    player.dodgePresses.push({ t, invuln: CFG.dodgeInvuln });
+    if (player.dodgePresses.length > 12) player.dodgePresses.shift();
+    Sfx.dodge();
+    checkLate(t, '闪避');
+  }
+
+  function checkLate(t, keyName) {
+    const rec = player.pendingLate;
+    if (!rec) return;
+    if (t - rec.impactAt <= CFG.lateWindow) {
+      rec.result = `${keyName}过晚`;
+      rec.offset = rec.impactAt - t;
+      setBanner(rec.result, '#ff6a6a', offsetText(rec.offset));
+      renderSide();
+    }
+    player.pendingLate = null;
+  }
+
+  function enemyContact(t) {
+    const behind = t < player.behindUntil;
+    return { x: ENEMY_X + (behind ? 18 : -18), y: GROUND_Y - 150, dir: behind ? -1 : 1 };
+  }
+
+  function lightAttack(t) {
+    if (!canAct(t)) return;
+    const L = CFG.light;
+    player.lockUntil = t + L.lock;
+    player.attack = { kind: 'light', at: t, dur: L.lock };
+    Sfx.light();
+    const c = enemyContact(t);
+    if (enemy.mode === 'idle') {
+      enemy.guardUntil = t + 220;
+      damageEnemySha(L.blockedShaDmg, t);
+      spawnSparks(c.x, c.y, '#ffffff', 10, 0.8);
+      Sfx.enemyGuard();
+    } else {
+      damageEnemy(L.dmg, t);
+      damageEnemySha(L.shaDmg, t);
+      spawnBlood(c.x, c.y, 8, c.dir);
+      Sfx.flesh(false);
+      hitStop(35);
+    }
+    player.sha = Math.min(CFG.playerSha, player.sha + L.gain);
+  }
+
+  function heavyAttack(t) {
+    if (!canAct(t)) return;
+    const Hv = CFG.heavy;
+    if (player.sha < Hv.cost) {
+      addText('杀气不足', playerAnchor(t).x, GROUND_Y - 220, '#d9a64a');
+      Sfx.denied();
+      return;
+    }
+    player.sha -= Hv.cost;
+    player.lockUntil = t + Hv.lock;
+    player.attack = { kind: 'heavy', at: t, dur: Hv.lock };
+    Sfx.heavy();
+    const c = enemyContact(t);
+    if (enemy.mode === 'idle') {
+      enemy.guardUntil = t + 300;
+      damageEnemy(Hv.blockedDmg, t);
+      damageEnemySha(Hv.blockedShaDmg, t);
+      spawnSparks(c.x, c.y, '#7cc4ff', 18, 1);
+      Sfx.enemyGuard();
+      hitStop(45);
+    } else {
+      damageEnemy(Hv.dmg, t);
+      damageEnemySha(Hv.shaDmg, t);
+      spawnBlood(c.x, c.y, 16, c.dir);
+      Sfx.flesh(true);
+      hitStop(60);
+      shakeScreen(5, 200);
+    }
+  }
+
+  function execute(t) {
+    if (!canAct(t) || enemy.mode !== 'broken') return;
+    player.lockUntil = t + CFG.execLock;
+    player.attack = { kind: 'exec', at: t, dur: CFG.execLock };
+    Sfx.execute();
+    const c = enemyContact(t);
+    spawnBlood(c.x, c.y, 40, c.dir);
+    addRing(c.x, c.y, '255,60,40', 10, 170, 380, 5);
+    flashScreen('120,0,0', 0.3, 300);
+    hitStop(140);
+    slowMo(500, 0.4);
+    shakeScreen(13, 380);
+    damageEnemy(CFG.execDmg, t, true);
+    if (state !== 'play') return;
+    enemy.mode = 'stagger';
+    enemy.staggerUntil = t + CFG.execLock + 400;
+    enemy.sha = CFG.enemySha;
+    setBanner('处 决', '#ff5a3c');
+  }
+
+  function switchWeapon(t) {
+    if (state !== 'play' || isBroken(t)) return;
+    const x = playerAnchor(t).x;
+    if (t < player.switchReadyAt) {
+      addText(`换武器冷却 ${((player.switchReadyAt - t) / 1000).toFixed(1)}s`, x, GROUND_Y - 220, '#8d877e');
+      Sfx.denied();
+      return;
+    }
+    const cd = CFG.switchBaseCd + CFG.switchExtraCd * (1 - player.sha / CFG.playerSha);
+    player.sha = CFG.playerSha;
+    player.switchReadyAt = t + cd;
+    player.weapon = 1 - player.weapon;
+    addText('换刃 · 杀气回满', x, GROUND_Y - 220, '#ffd27a');
+    addRing(x, GROUND_Y - 110, '255,200,100', 20, 90, 300, 2);
+    Sfx.switchW();
+  }
+
+  // ---------- 伤害与状态 ----------
+  function damagePlayer(dmg, t) {
+    const real = isBroken(t) ? dmg * CFG.brokenDmgMul : dmg;
+    player.hp = Math.max(0, player.hp - real);
+    player.hurtAt = t;
+    spawnBlood(PLAYER_X + 14, GROUND_Y - 135, 22, -1);
+    Sfx.hurt();
+    hitStop(80);
+    shakeScreen(10, 260);
+    flashScreen('170,0,0', 0.3, 240);
+    if (player.hp <= 0) endGame(false);
+  }
+
+  function breakPlayer(t) {
+    player.sha = 0;
+    player.broken = true;
+    player.brokenUntil = t + CFG.playerBreakMs;
+    addText('破 防', PLAYER_X, GROUND_Y - 230, '#ff7a7a', 28);
+    Sfx.playerBreak();
+    shakeScreen(12, 300);
+  }
+
+  function changePlayerSha(delta, t) {
+    player.sha = clamp(player.sha + delta, 0, CFG.playerSha);
+    if (player.sha <= 0 && !isBroken(t)) breakPlayer(t);
+  }
+
+  function damageEnemy(dmg, t, isExec) {
+    const real = enemy.mode === 'broken' && !isExec ? dmg * CFG.brokenDmgMul : dmg;
+    enemy.hp = Math.max(0, enemy.hp - real);
+    enemy.hurtAt = t;
+    if (enemy.hp <= 0) endGame(true);
+  }
+
+  function damageEnemySha(v, t) {
+    if (enemy.mode === 'broken') return;
+    enemy.sha = Math.max(0, enemy.sha - v);
+    if (enemy.sha <= 0) {
+      enemy.mode = 'broken';
+      enemy.brokenUntil = t + CFG.enemyBreakMs;
+      enemy.combo = null;
+      enemy.hit = null;
+      cueFx = null;
+      setBanner('敌 人 破 防', '#ffcf5a', '按 E 处决');
+      Sfx.enemyBreak();
+      slowMo(500, 0.35);
+      addRing(ENEMY_X, GROUND_Y - 120, '255,200,90', 20, 200, 500, 3);
+    }
+  }
+
+  function ghostStep(t) {
+    spawnSmoke(PLAYER_X, GROUND_Y - 90, 26);
+    spawnSmoke(BEHIND_X, GROUND_Y - 90, 26);
+    player.behind = true;
+    player.behindUntil = t + CFG.ghostStagger;
+    player.ghostAt = t;
+    if (enemy.mode === 'windup') {
+      enemy.mode = 'stagger';
+      enemy.staggerUntil = t + CFG.ghostStagger;
+      enemy.combo = null;
+      enemy.hit = null;
+    }
+    Sfx.ghost();
+    slowMo(420, 0.3);
+  }
+
+  function clashFx(big, rgb) {
+    Sfx.parry(big);
+    hitStop(big ? 90 : 60);
+    zoomPunch(big ? 0.07 : 0.035);
+    flashScreen('255,240,210', big ? 0.35 : 0.18, 140);
+    spawnSparks(CLASH.x, CLASH.y, '#ffb347', big ? 46 : 24, 1.3);
+    addRing(CLASH.x, CLASH.y, rgb || '255,190,90', 6, big ? 150 : 90, big ? 320 : 220, 4);
+  }
+
+  // ---------- 敌人 ----------
+  function startCombo(t) {
+    enemy.combo = COMBOS[Math.floor(Math.random() * COMBOS.length)];
+    enemy.idx = 0;
+    startHit(t);
+  }
+
+  function startHit(t) {
+    const [type, windup] = enemy.combo[enemy.idx];
+    const flashAt = t + CFG.hitRecover;
+    enemy.hit = { type, windup, flashAt, impactAt: flashAt + windup, flashed: false, swung: false };
+    enemy.mode = 'windup';
+  }
+
+  function updateEnemy(now) {
+    switch (enemy.mode) {
+      case 'idle':
+        if (now >= enemy.nextAt) startCombo(now);
+        break;
+      case 'windup': {
+        const h = enemy.hit;
+        if (!h.flashed && now >= h.flashAt) {
+          h.flashed = true;
+          if (h.type !== 'normal') {
+            cueFx = { type: h.type, at: h.flashAt };
+            glints.push({ type: h.type, born: h.flashAt });
+            Sfx.cue(h.type);
+          }
+        }
+        if (!h.swung && now >= h.impactAt - CFG.strikeMs) {
+          h.swung = true;
+          Sfx.enemySwing(h.type);
+        }
+        if (now >= h.impactAt) {
+          const t = h.impactAt;
+          enemy.lastImpactAt = t;
+          enemy.lastMove = MOVES[h.type];
+          resolveHit(h, t);
+          if (state !== 'play') return;
+          if (enemy.mode === 'windup') {
+            enemy.idx++;
+            if (enemy.idx < enemy.combo.length) {
+              startHit(t);
+            } else {
+              enemy.mode = 'idle';
+              enemy.combo = null;
+              enemy.hit = null;
+              enemy.nextAt = t + rand(1400, 2600);
+            }
+          }
+        }
+        break;
+      }
+      case 'stagger':
+        if (now >= enemy.staggerUntil) {
+          enemy.mode = 'idle';
+          enemy.nextAt = now + rand(600, 1200);
+        }
+        break;
+      case 'broken':
+        if (now >= enemy.brokenUntil) {
+          enemy.mode = 'idle';
+          enemy.sha = CFG.enemySha;
+          enemy.nextAt = now + 800;
+        }
+        break;
+    }
+  }
+
+  function lastBefore(arr, t) {
+    for (let i = arr.length - 1; i >= 0; i--) if (arr[i].t <= t) return arr[i];
+    return null;
+  }
+
+  function offsetText(off) {
+    if (off == null) return '';
+    return off >= 0 ? `提前 ${Math.round(off)}ms` : `晚 ${Math.round(-off)}ms`;
+  }
+
+  // ---------- 判定 ----------
+  function resolveHit(hit, t) {
+    const A = ATTACK[hit.type];
+    const W0 = perfectWindow();
+    const mul = diff.guardMul;
+    const rec = { type: hit.type, flashAt: hit.flashAt, impactAt: t, result: '', grade: 'fail', offset: null, reaction: null };
+    const broken = isBroken(t);
+    const d = lastBefore(player.dodgePresses, t);
+    const p = lastBefore(player.parryPresses, t);
+    let bannerColor = null;
+    const enemyWasBroken = enemy.mode === 'broken';
+    player.pendingLate = null;
+
+    if (hit.type === 'black') {
+      Sfx.slam();
+      shakeScreen(6, 260);
+      addRing(PLAYER_X + 40, GROUND_Y, '160,110,240', 10, 160, 400, 3, 0.25);
+      spawnSmoke(PLAYER_X + 50, GROUND_Y - 10, 10, 'rgba(40,25,60,0.6)');
+    }
+
+    if (!broken && d && t - d.t <= d.invuln) {
+      rec.offset = t - d.t;
+      rec.reaction = d.t - hit.flashAt;
+      if (hit.type === 'red' && t - d.t <= W0) {
+        d.invuln = CFG.perfectDodgeInvuln;
+        rec.grade = 'perfect';
+        rec.result = '完美闪避 · 鬼步';
+        damageEnemySha(CFG.perfectDodgeEnemySha, t);
+        hitStop(50);
+        flashScreen('255,255,255', 0.22, 150);
+        addRing(PLAYER_X, GROUND_Y - 110, ATTACK.red.rgb, 10, 130, 320, 3);
+        ghostStep(t);
+      } else {
+        rec.grade = 'ok';
+        rec.result = hit.type === 'blue' ? '闪避（蓝光可弹反）' : '闪避成功';
+      }
+    } else if (!broken && p && t - p.t <= p.window) {
+      rec.offset = t - p.t;
+      rec.reaction = p.t - hit.flashAt;
+      if (hit.type === 'red') {
+        rec.result = '按错：红光不可格挡';
+        damagePlayer(A.dmg, t);
+      } else if (hit.type === 'blue') {
+        rec.grade = 'perfect';
+        rec.result = '完美弹反 · 鬼步';
+        player.sha = CFG.playerSha;
+        damageEnemySha(CFG.parryEnemySha.blue, t);
+        clashFx(true, ATTACK.blue.rgb);
+        ghostStep(t);
+      } else if (hit.type === 'normal') {
+        rec.grade = 'perfect';
+        rec.result = '完美弹反';
+        changePlayerSha(10, t);
+        damageEnemySha(CFG.parryEnemySha.normal, t);
+        clashFx(false);
+      } else {
+        rec.grade = 'ok';
+        rec.result = '弹反黑光 · 杀气大损';
+        bannerColor = '#b48cff';
+        damageEnemySha(CFG.parryEnemySha.black, t);
+        changePlayerSha(-CFG.parryBlackSelfSha * mul, t);
+        Sfx.block();
+        hitStop(60);
+        spawnSparks(CLASH.x, CLASH.y, '#b48cff', 22, 1);
+      }
+    } else if (!broken && guardHeld(t)) {
+      if (hit.type === 'red') {
+        rec.result = '红光不可格挡（架势无效）';
+        changePlayerSha(-A.guardCost * mul, t);
+        damagePlayer(A.dmg, t);
+      } else {
+        const cost = A.guardCost * mul;
+        if (player.sha > cost) {
+          player.sha -= cost;
+          rec.grade = 'ok';
+          rec.result = hit.type === 'normal' ? '架势格挡' : `架势硬接${A.name} · 杀气 -${Math.round(cost)}`;
+          Sfx.block();
+          hitStop(45);
+          spawnSparks(CLASH.x, CLASH.y, '#ffffff', 14, 0.9);
+          shakeScreen(3, 120);
+        } else {
+          rec.result = '杀气耗尽 · 破防';
+          breakPlayer(t);
+          damagePlayer(A.dmg, t);
+        }
+      }
+    } else {
+      damagePlayer(A.dmg, t);
+      if (broken) {
+        rec.result = '破防中受击';
+      } else {
+        const cand = [p, d].filter(x => x && t - x.t <= CFG.earlyWindow).sort((a, b) => b.t - a.t)[0];
+        const after = [...player.parryPresses, ...player.dodgePresses]
+          .filter(x => x.t > t && x.t - t <= CFG.lateWindow)
+          .sort((a, b) => a.t - b.t)[0];
+        if (!cand && after) {
+          rec.result = player.parryPresses.includes(after) ? '格挡过晚' : '闪避过晚';
+          rec.offset = t - after.t;
+        } else if (!cand) {
+          rec.result = '未反应';
+          player.pendingLate = rec;
+        } else if (cand === p && hit.type === 'red') {
+          rec.result = '按错：红光不可格挡';
+          rec.offset = t - p.t;
+        } else if (cand === p && p.window < W0 && t - p.t <= W0) {
+          rec.result = p.window === 0 ? '连按惩罚：无弹反窗口' : '连按惩罚：弹反窗口缩短';
+          rec.offset = t - p.t;
+        } else {
+          rec.result = cand === p ? '格挡过早' : '闪避过早';
+          rec.offset = t - cand.t;
+          rec.reaction = cand.t - hit.flashAt;
+        }
+      }
+    }
+
+    if (!bannerColor) bannerColor = { perfect: '#ffcf5a', ok: '#bfe3b4', fail: '#ff6a6a' }[rec.grade];
+    let sub = rec.offset != null ? `${offsetText(rec.offset)} · 窗口 ${Math.round(W0)}ms` : '';
+    if (!enemyWasBroken && enemy.mode === 'broken') sub = '敌人破防 · 按 E 处决';
+    if (state === 'play') setBanner(rec.result, bannerColor, sub);
+    records.push(rec);
+    renderSide();
+  }
+
+  // ---------- 统计面板 ----------
+  function summarize() {
+    const s = { total: records.length, perfect: 0, ok: 0, fail: 0, avgOffset: null, avgReaction: null };
+    const offs = [], reacts = [];
+    for (const r of records) {
+      s[r.grade]++;
+      if (r.grade === 'perfect' && r.offset != null) offs.push(r.offset);
+      if (r.grade !== 'fail' && r.reaction != null && r.reaction > 0) reacts.push(r.reaction);
+    }
+    if (offs.length) s.avgOffset = Math.round(offs.reduce((a, b) => a + b, 0) / offs.length);
+    if (reacts.length) s.avgReaction = Math.round(reacts.reduce((a, b) => a + b, 0) / reacts.length);
+    return s;
+  }
+
+  function renderSide() {
+    statsBody.innerHTML = Object.keys(ATTACK).map(type => {
+      const A = ATTACK[type];
+      const list = records.filter(r => r.type === type);
+      const n = list.length;
+      const c = g => list.filter(r => r.grade === g).length;
+      const [pc, oc, fc] = [c('perfect'), c('ok'), c('fail')];
+      const w = v => (n ? v / n * 100 : 0).toFixed(1);
+      return `<div class="typeRow"><span style="color:${A.color}">${A.name}</span>` +
+        `<div class="stack"><i class="p" style="width:${w(pc)}%"></i><i class="o" style="width:${w(oc)}%"></i><i class="f" style="width:${w(fc)}%"></i></div>` +
+        `<span class="nums">${pc} / ${oc} / ${fc}</span></div>`;
+    }).join('');
+
+    const s = summarize();
+    const pct = v => (s.total ? Math.round(v / s.total * 100) : 0) + '%';
+    statsExtra.innerHTML =
+      `<div><b>${pct(s.perfect)}</b><small>完美率</small></div>` +
+      `<div><b>${pct(s.perfect + s.ok)}</b><small>成功率</small></div>` +
+      `<div><b>${s.avgOffset ?? '-'}${s.avgOffset != null ? 'ms' : ''}</b><small>完美时平均提前量</small></div>` +
+      `<div><b>${s.avgReaction ?? '-'}${s.avgReaction != null ? 'ms' : ''}</b><small>平均反应时间（提示→按键）</small></div>`;
+
+    logEl.innerHTML = records.slice(-40).reverse().map(r => {
+      const A = ATTACK[r.type];
+      const off = offsetText(r.offset);
+      const react = r.reaction != null && r.reaction > 0 ? `反应 ${Math.round(r.reaction)}ms` : '';
+      const meta = [off, react].filter(Boolean).join(' · ');
+      return `<li class="${r.grade}" style="--c:${A.color}"><span class="r">${r.result}</span>` +
+        `${meta ? `<br><span class="m">${A.name} · ${meta}</span>` : `<br><span class="m">${A.name}</span>`}</li>`;
+    }).join('');
+  }
+
+  // ---------- 特效 ----------
+  function spawnSparks(x, y, color, n, speed = 1) {
+    const now = gameNow();
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TAU), v = rand(150, 520) * speed;
+      particles.push({ kind: 'spark', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 80, born: now, life: rand(180, 420), color, size: rand(1.2, 2.6), g: 900 });
+    }
+  }
+
+  function spawnBlood(x, y, n, dir) {
+    const now = gameNow();
+    for (let i = 0; i < n; i++) {
+      particles.push({
+        kind: 'blood', x, y, vx: dir * rand(-40, 320), vy: rand(-280, -30), born: now, life: rand(700, 1300),
+        color: Math.random() < 0.5 ? '#6e0d12' : '#9a1419', size: rand(1.8, 4.5), g: 1100,
+      });
+    }
+  }
+
+  function spawnSmoke(x, y, n, color = 'rgba(12,10,16,0.75)') {
+    const now = gameNow();
+    for (let i = 0; i < n; i++) {
+      particles.push({ kind: 'smoke', x: x + rand(-25, 25), y: y + rand(-60, 40), vx: rand(-40, 40), vy: rand(-60, -10), born: now, life: rand(450, 850), color, size: rand(7, 15), g: 0 });
+    }
+  }
+
+  function addRing(x, y, rgb, r0, r1, life, width, squash = 1) {
+    rings.push({ x, y, rgb, r0, r1, born: gameNow(), life, width, squash });
+  }
+
+  function addText(text, x, y, color, size = 18) {
+    texts.push({ text, x, y, color, size, born: performance.now(), life: 900 });
+  }
+
+  function setBanner(text, color, sub = '') {
+    banner = { text, color, sub, born: performance.now() };
+  }
+
+  function flashScreen(rgb, alpha, dur) {
+    screenFlashes.push({ rgb, alpha, start: performance.now(), dur });
+  }
+
+  function shakeScreen(mag, dur) {
+    const r = performance.now();
+    if (mag >= currentShake(r)) {
+      cam.shakeMag = mag;
+      cam.shakeStart = r;
+      cam.shakeDur = dur;
+    }
+  }
+
+  function currentShake(r) {
+    const k = (r - cam.shakeStart) / cam.shakeDur;
+    return k >= 1 ? 0 : cam.shakeMag * (1 - k) * (1 - k);
+  }
+
+  function zoomPunch(z) {
+    cam.zoom = z;
+    cam.zoomStart = performance.now();
+  }
+
+  // ---------- 背景 ----------
+  const bgCanvas = document.createElement('canvas');
+
+  function buildBackground() {
+    bgCanvas.width = W * DPR;
+    bgCanvas.height = H * DPR;
+    const g = bgCanvas.getContext('2d');
+    g.scale(DPR, DPR);
+
+    const sky = g.createLinearGradient(0, 0, 0, GROUND_Y);
+    sky.addColorStop(0, '#14161b');
+    sky.addColorStop(0.55, '#2b2f37');
+    sky.addColorStop(1, '#5a5a57');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, GROUND_Y);
+
+    const mg = g.createRadialGradient(735, 118, 10, 735, 118, 180);
+    mg.addColorStop(0, 'rgba(235,225,200,0.35)');
+    mg.addColorStop(1, 'rgba(235,225,200,0)');
+    g.fillStyle = mg;
+    g.fillRect(540, 0, 400, 320);
+    g.fillStyle = '#e2dac8';
+    g.beginPath();
+    g.arc(735, 118, 44, 0, TAU);
+    g.fill();
+    g.fillStyle = 'rgba(170,160,140,0.22)';
+    [[722, 105, 9], [748, 128, 12], [730, 136, 6]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); });
+
+    let seed = 20261102;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+    const ridge = (base, amp, color, rough) => {
+      let pts = [[0, base + (rnd() - 0.5) * amp], [W, base + (rnd() - 0.5) * amp]];
+      let a = amp;
+      for (let it = 0; it < 7; it++) {
+        const next = [];
+        for (let i = 0; i < pts.length - 1; i++) {
+          const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+          next.push(pts[i], [(x1 + x2) / 2, (y1 + y2) / 2 + (rnd() - 0.5) * a]);
+        }
+        next.push(pts[pts.length - 1]);
+        pts = next;
+        a *= rough;
+      }
+      g.fillStyle = color;
+      g.beginPath();
+      g.moveTo(0, H);
+      pts.forEach(([x, y]) => g.lineTo(x, y));
+      g.lineTo(W, H);
+      g.closePath();
+      g.fill();
+    };
+
+    const mist = (y, h, a) => {
+      const m = g.createLinearGradient(0, y - h, 0, y + h);
+      m.addColorStop(0, 'rgba(190,190,195,0)');
+      m.addColorStop(0.5, `rgba(190,190,195,${a})`);
+      m.addColorStop(1, 'rgba(190,190,195,0)');
+      g.fillStyle = m;
+      g.fillRect(0, y - h, W, h * 2);
+    };
+
+    ridge(270, 220, 'rgba(78,84,94,0.85)', 0.55);
+    mist(330, 50, 0.12);
+    ridge(330, 150, '#363a42', 0.55);
+    mist(375, 40, 0.14);
+    ridge(385, 80, '#1f2126', 0.5);
+    mist(415, 25, 0.1);
+
+    const gg = g.createLinearGradient(0, GROUND_Y, 0, H);
+    gg.addColorStop(0, '#1a1a1e');
+    gg.addColorStop(1, '#070708');
+    g.fillStyle = gg;
+    g.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    g.strokeStyle = 'rgba(200,190,170,0.18)';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.moveTo(0, GROUND_Y + 0.5);
+    g.lineTo(W, GROUND_Y + 0.5);
+    g.stroke();
+
+    for (let i = 0; i < 70; i++) {
+      const y = GROUND_Y + 6 + rnd() * (H - GROUND_Y - 10);
+      const x = rnd() * W, l = 20 + rnd() * 120;
+      g.strokeStyle = `rgba(255,255,255,${0.015 + rnd() * 0.03})`;
+      g.lineWidth = 1 + rnd() * 2;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(x + l / 2, y - 2 + rnd() * 4, x + l, y + rnd() * 2);
+      g.stroke();
+    }
+
+    g.strokeStyle = '#0c0c0f';
+    g.lineWidth = 1.6;
+    for (let i = 0; i < 90; i++) {
+      const x = rnd() * W, n = 3 + Math.floor(rnd() * 4);
+      for (let j = 0; j < n; j++) {
+        const hgt = 6 + rnd() * 16, lean = (rnd() - 0.5) * 10;
+        g.beginPath();
+        g.moveTo(x + j * 2, GROUND_Y + 1);
+        g.quadraticCurveTo(x + j * 2 + lean * 0.3, GROUND_Y - hgt * 0.6, x + j * 2 + lean, GROUND_Y - hgt);
+        g.stroke();
+      }
+    }
+
+    g.strokeStyle = '#0a0a0c';
+    g.lineCap = 'round';
+    const branch = (x, y, len, ang, w, depth) => {
+      if (depth === 0 || len < 4) return;
+      const x2 = x + Math.cos(ang) * len, y2 = y - Math.sin(ang) * len;
+      g.lineWidth = w;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x2, y2);
+      g.stroke();
+      branch(x2, y2, len * 0.72, ang + 0.35 + (rnd() - 0.5) * 0.4, w * 0.68, depth - 1);
+      branch(x2, y2, len * 0.68, ang - 0.4 + (rnd() - 0.5) * 0.4, w * 0.68, depth - 1);
+    };
+    branch(70, GROUND_Y, 90, Math.PI / 2 + 0.15, 12, 8);
+  }
+
+  const embers = [];
+
+  function drawAtmosphere(rnow, dtReal) {
+    for (let i = 0; i < 3; i++) {
+      const speed = 0.012 + i * 0.006;
+      const x = ((rnow * speed + i * 420) % (W + 700)) - 350;
+      const y = 365 + i * 22;
+      const m = ctx.createRadialGradient(x, y, 0, x, y, 300);
+      m.addColorStop(0, 'rgba(200,200,210,0.07)');
+      m.addColorStop(1, 'rgba(200,200,210,0)');
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1, 0.22);
+      ctx.translate(-x, -y);
+      ctx.fillStyle = m;
+      ctx.fillRect(x - 300, y - 300, 600, 600);
+      ctx.restore();
+    }
+
+    if (embers.length < 40 && Math.random() < 0.3) {
+      embers.push({ x: rand(0, W), y: H + 5, vx: rand(-8, 8), vy: rand(-40, -22), life: rand(8, 16), age: 0, size: rand(0.8, 2), ph: rand(0, 6) });
+    }
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = embers.length - 1; i >= 0; i--) {
+      const e = embers[i];
+      e.age += dtReal;
+      e.x += e.vx * dtReal + Math.sin(e.age * 1.3 + e.ph) * 0.3;
+      e.y += e.vy * dtReal;
+      if (e.age > e.life || e.y < -5) { embers.splice(i, 1); continue; }
+      ctx.fillStyle = `rgba(255,140,60,${0.5 * Math.sin(Math.PI * e.age / e.life)})`;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.size, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ---------- 人物 ----------
+  function line(x1, y1, x2, y2) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  function geom(o) {
+    const f = o.f, x = o.x, crouch = o.crouch || 0;
+    const footY = GROUND_Y + (o.yOff || 0);
+    const hipX = x, hipY = footY - 82 + crouch * 22;
+    const lr = (o.lean || 0) * Math.PI / 180;
+    const shX = hipX + f * Math.sin(lr) * 64, shY = hipY - Math.cos(lr) * 64;
+    const a = o.angle * Math.PI / 180;
+    const dx = f * Math.cos(a), dy = -Math.sin(a);
+    const reach = 40 + (o.reach || 0);
+    const hx = shX + dx * reach, hy = shY + 8 + dy * reach;
+    const L = o.bladeLen || 96;
+    const spread = 20 + crouch * 16;
+    const fF = { x: x + f * spread, y: footY }, fB = { x: x - f * (spread - 2), y: footY };
+    return {
+      f, x, hipX, hipY, shX, shY, hx, hy, dx, dy, footY,
+      headX: shX + f * (Math.sin(lr) * 20 + 3), headY: shY - 21,
+      tx: hx + dx * L, ty: hy + dy * L,
+      fF, fB,
+      kF: { x: (hipX + fF.x) / 2 + f * (6 + crouch * 10), y: (hipY + footY) / 2 - 2 },
+      kB: { x: (hipX + fB.x) / 2 - f * (2 + crouch * 6), y: (hipY + footY) / 2 + 2 },
+    };
+  }
+
+  function bodyPath(g, color, ox, oy, hat) {
+    const f = g.f;
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(g.hipX, g.hipY);
+    ctx.lineTo(g.kB.x, g.kB.y);
+    ctx.lineTo(g.fB.x, g.fB.y);
+    ctx.moveTo(g.hipX, g.hipY);
+    ctx.lineTo(g.kF.x, g.kF.y);
+    ctx.lineTo(g.fF.x, g.fF.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(g.hipX - f * 15, g.hipY - 10);
+    ctx.lineTo(g.hipX + f * 17, g.hipY - 10);
+    ctx.lineTo(g.kF.x + f * 10, g.kF.y + 14);
+    ctx.lineTo(g.kB.x - f * 14, g.kB.y + 16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 22;
+    line(g.hipX, g.hipY - 6, g.shX, g.shY + 6);
+    ctx.lineWidth = 8;
+    line(g.shX, g.shY + 6, g.shX - f * 12, g.shY + 40);
+    ctx.beginPath();
+    ctx.arc(g.headX, g.headY, 12.5, 0, TAU);
+    ctx.fill();
+    if (hat) {
+      ctx.beginPath();
+      ctx.moveTo(g.headX - 36, g.headY - 2);
+      ctx.quadraticCurveTo(g.headX, g.headY - 34, g.headX + 36, g.headY - 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.lineWidth = 8;
+    line(g.shX, g.shY + 8, g.hx, g.hy);
+    ctx.restore();
+  }
+
+  function drawScarf(g, rnow) {
+    const f = g.f, sx = g.shX - f * 2, sy = g.shY - 4, w = Math.sin(rnow / 180) * 8;
+    ctx.save();
+    ctx.strokeStyle = '#8e1219';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.bezierCurveTo(sx - f * 25, sy + 4 + w, sx - f * 45, sy - 6 - w, sx - f * 70, sy + 6 + w * 1.4);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBlade(g, color, glow) {
+    const px = -g.dy, py = g.dx;
+    ctx.save();
+    if (glow) {
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 26;
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(g.hx + px * 2.6, g.hy + py * 2.6);
+    ctx.lineTo(g.tx, g.ty);
+    ctx.lineTo(g.hx - px * 2.6, g.hy - py * 2.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#6b5a3a';
+    ctx.lineWidth = 4;
+    line(g.hx + px * 8, g.hy + py * 8, g.hx - px * 8, g.hy - py * 8);
+    ctx.restore();
+  }
+
+  function drawFighter(o, rnow) {
+    const g = geom(o);
+    ctx.save();
+    ctx.globalAlpha = o.alpha ?? 1;
+    const lift = clamp(-(o.yOff || 0) / 120, 0, 0.5);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(g.x, GROUND_Y + 3, 38 * (1 - lift), 6 * (1 - lift), 0, 0, TAU);
+    ctx.fill();
+    if (o.aura) {
+      const cx = g.shX, cy = g.shY + 30;
+      const ag = ctx.createRadialGradient(cx, cy, 0, cx, cy, 110);
+      ag.addColorStop(0, `rgba(${o.aura.rgb},${o.aura.a})`);
+      ag.addColorStop(1, `rgba(${o.aura.rgb},0)`);
+      ctx.fillStyle = ag;
+      ctx.fillRect(cx - 120, cy - 120, 240, 240);
+    }
+    bodyPath(g, o.rim, -g.f * 2.2, -1.6, o.hat);
+    bodyPath(g, '#0a0a0d', 0, 0, o.hat);
+    if (o.scarf) drawScarf(g, rnow);
+    if (o.white > 0) bodyPath(g, `rgba(255,255,255,${o.white})`, 0, 0, o.hat);
+    drawBlade(g, o.blade, o.glow);
+    ctx.restore();
+    return g;
+  }
+
+  function enemyPose(now, rnow) {
+    const breath = Math.sin(rnow / 420);
+    const o = {
+      x: ENEMY_X, f: -1, angle: 18 + breath * 2, crouch: 0.2, lean: 4 + breath, reach: 0, yOff: 0,
+      rim: '#c0583c', blade: '#c9c4ba', glow: null, hat: true, aura: null, white: 0, bladeLen: 104, swinging: false,
+    };
+    const since = now - enemy.lastImpactAt;
+    const mvPrev = enemy.lastMove;
+    let residual = 0;
+    if (mvPrev && since >= 0 && since < 300) {
+      const k = easeInOut(since / 300);
+      residual = mvPrev.lunge * (1 - k);
+      o.angle = lerp(mvPrev.end, o.angle, k);
+      o.lean = lerp(mvPrev.leanDown, o.lean, k);
+      o.swinging = since < 60;
+    }
+    o.x = ENEMY_X - residual;
+    if (now - enemy.hurtAt < 120) o.white = 0.8 * (1 - (now - enemy.hurtAt) / 120);
+
+    if (enemy.mode === 'windup' && enemy.hit) {
+      const h = enemy.hit, mv = MOVES[h.type], A = ATTACK[h.type];
+      if (h.type !== 'normal') {
+        o.blade = h.type === 'black' ? '#2b1d40' : A.color;
+        o.glow = A.color;
+      }
+      const strikeStart = h.impactAt - CFG.strikeMs;
+      const baseAngle = o.angle, baseLean = o.lean;
+      if (now >= h.flashAt && now < strikeStart) {
+        const k = (now - h.flashAt) / (strikeStart - h.flashAt);
+        const e = easeOut(Math.min(1, k * 1.5));
+        o.angle = lerp(baseAngle, mv.raise, e) + (k > 0.65 ? Math.sin(rnow / 16) * 1.2 : 0);
+        o.crouch = lerp(0.2, mv.crouch, e);
+        o.reach = lerp(0, mv.pull, e);
+        o.lean = lerp(baseLean, mv.leanUp, e);
+      } else if (now >= strikeStart) {
+        const k = clamp((now - strikeStart) / CFG.strikeMs, 0, 1), e = k * k;
+        o.angle = lerp(mv.raise, mv.end, e);
+        o.crouch = lerp(mv.crouch, 0.35, e);
+        o.reach = lerp(mv.pull, mv.thrust, e);
+        o.lean = lerp(mv.leanUp, mv.leanDown, e);
+        o.x = ENEMY_X - residual - mv.lunge * e;
+        if (mv.jump) o.yOff = -mv.jump * Math.sin(Math.PI * k);
+        o.swinging = true;
+      }
+      if (h.type !== 'normal' && now >= h.flashAt) {
+        const fk = (now - h.flashAt) / 260;
+        o.aura = { rgb: A.rgb, a: fk < 1 ? 0.55 * (1 - fk) + 0.12 : 0.12 };
+      }
+    } else if (enemy.mode === 'stagger') {
+      o.angle = -45; o.lean = -14; o.crouch = 0.35; o.reach = -6;
+    } else if (enemy.mode === 'broken') {
+      o.angle = -75 + Math.sin(rnow / 200) * 3;
+      o.lean = -8 + Math.sin(rnow / 300) * 4;
+      o.crouch = 1;
+      o.rim = '#7a4a3c';
+    } else if (now < enemy.guardUntil) {
+      o.angle = 78; o.crouch = 0.35; o.reach = -6;
+    }
+    return o;
+  }
+
+  function playerPose(now, rnow) {
+    const anc = playerAnchor(now);
+    const breath = Math.sin(rnow / 460);
+    const o = {
+      x: anc.x, f: anc.f, angle: 24 + breath * 2, crouch: 0.22, lean: 6 + breath, reach: 0, yOff: 0,
+      rim: '#8fb4e0', blade: player.weapon === 0 ? '#dfe5ec' : '#e6cf98', glow: null, scarf: true,
+      white: 0, alpha: 1, bladeLen: 96, swinging: false, invuln: false,
+    };
+    const ds = now - player.dodgeAt;
+    if (ds < CFG.dodgeLock) {
+      const k = ds / CFG.dodgeLock;
+      const out = k < 0.5 ? easeOut(k / 0.5) : 1 - easeInOut((k - 0.5) / 0.5);
+      o.x -= o.f * 70 * out;
+      o.crouch = 0.45;
+      o.lean = -10;
+      o.angle = 10;
+      const d = player.dodgePresses[player.dodgePresses.length - 1];
+      if (d && ds < d.invuln) { o.alpha = 0.55; o.invuln = true; }
+    }
+    const a = player.attack;
+    if (isBroken(now)) {
+      o.angle = -70 + Math.sin(rnow / 120) * 4;
+      o.lean = -18;
+      o.crouch = 0.9;
+      o.rim = '#5f6670';
+    } else if (a && now < a.at + a.dur) {
+      const k = (now - a.at) / a.dur;
+      const s = easeOut(Math.min(1, k / 0.4));
+      const back = k > 0.6 ? (k - 0.6) / 0.4 : 0;
+      const P = {
+        light: { from: 125, to: -30, lunge: 36 },
+        heavy: { from: 172, to: -55, lunge: 62 },
+        exec: { from: 178, to: -75, lunge: Math.max(0, Math.abs(ENEMY_X - anc.x) - 95) },
+      }[a.kind];
+      o.angle = lerp(lerp(P.from, P.to, s), 24, back);
+      o.x += o.f * P.lunge * Math.sin(Math.PI * Math.min(1, k * 1.2));
+      o.lean = lerp(-6, 18, s);
+      o.crouch = 0.3 + 0.2 * s;
+      if (a.kind === 'heavy') { o.glow = '#3fa9ff'; o.blade = '#bfe2ff'; }
+      if (a.kind === 'exec') { o.glow = '#ff3b3b'; o.blade = '#ffd0c8'; }
+      o.swinging = k < 0.45;
+    } else if (guardHeld(now)) {
+      o.angle = 78;
+      o.reach = -8;
+      o.crouch = 0.38;
+      o.lean = 2;
+    }
+    if (now - player.hurtAt < 140) o.white = 0.85 * (1 - (now - player.hurtAt) / 140);
+    if (now - player.ghostAt < 500) o.alpha = Math.min(o.alpha, 0.35 + 0.65 * ((now - player.ghostAt) / 500));
+    return o;
+  }
+
+  function sampleTrail(arr, g, now, rgb) {
+    const last = arr[arr.length - 1];
+    if (last && last.t === now) return;
+    arr.push({ hx: g.hx, hy: g.hy, tx: g.tx, ty: g.ty, t: now, rgb });
+  }
+
+  function drawTrail(arr, now, life = 120) {
+    while (arr.length && now - arr[0].t > life) arr.shift();
+    if (arr.length < 2) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 1; i < arr.length; i++) {
+      const a = arr[i - 1], b = arr[i];
+      const k = 1 - (now - b.t) / life;
+      ctx.fillStyle = `rgba(${b.rgb},${0.45 * k})`;
+      ctx.beginPath();
+      ctx.moveTo(a.hx + (a.tx - a.hx) * 0.3, a.hy + (a.ty - a.hy) * 0.3);
+      ctx.lineTo(a.tx, a.ty);
+      ctx.lineTo(b.tx, b.ty);
+      ctx.lineTo(b.hx + (b.tx - b.hx) * 0.3, b.hy + (b.ty - b.hy) * 0.3);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ---------- 场景特效 ----------
+  function drawCueFx(now) {
+    if (enemy.mode === 'windup' && enemy.hit && enemy.hit.type === 'black' && now >= enemy.hit.flashAt && Math.random() < 0.7) {
+      spawnSmoke(ENEMY_X + rand(-20, 20), GROUND_Y - rand(20, 140), 1, 'rgba(40,20,70,0.55)');
+    }
+    if (!cueFx) return;
+    const k = (now - cueFx.at) / 320;
+    if (k > 1 || k < 0) { if (k > 1) cueFx = null; return; }
+    const al = 1 - k;
+    const ey = GROUND_Y - 150;
+    ctx.save();
+    if (cueFx.type === 'red') {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = `rgba(255,50,50,${al})`;
+      ctx.shadowColor = '#ff2020';
+      ctx.shadowBlur = 24;
+      ctx.lineWidth = 7 * al + 1;
+      line(W + 40, ey - 50 + 90 * k, -40, ey + 30 - 70 * k);
+      ctx.lineWidth = 2;
+      line(W + 40, ey - 30 + 90 * k, -40, ey + 50 - 70 * k);
+    } else if (cueFx.type === 'blue') {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = `rgba(90,180,255,${0.8 * al})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(ENEMY_X, ey + 10, 30 + 110 * easeOut(k), 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawGlints(now) {
+    if (!enemyGeom) return;
+    glints = glints.filter(gl => now - gl.born < 340);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const gl of glints) {
+      const k = (now - gl.born) / 340;
+      if (k < 0) continue;
+      const s = k < 0.2 ? k / 0.2 : 1 - (k - 0.2) / 0.8;
+      const R = 70 * s;
+      const rgb = ATTACK[gl.type].rgb;
+      ctx.save();
+      ctx.translate(enemyGeom.tx, enemyGeom.ty);
+      const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.7);
+      rg.addColorStop(0, `rgba(${rgb},${0.9 * s})`);
+      rg.addColorStop(1, `rgba(${rgb},0)`);
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(0, 0, R * 0.7, 0, TAU);
+      ctx.fill();
+      ctx.rotate(k * 0.8);
+      ctx.fillStyle = `rgba(255,255,255,${s})`;
+      for (const [len, wid] of [[R, R * 0.07], [R * 0.6, R * 0.05]]) {
+        ctx.beginPath();
+        ctx.moveTo(-len, 0); ctx.lineTo(0, -wid); ctx.lineTo(len, 0); ctx.lineTo(0, wid);
+        ctx.closePath();
+        ctx.fill();
+        ctx.rotate(Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(-len, 0); ctx.lineTo(0, -wid); ctx.lineTo(len, 0); ctx.lineTo(0, wid);
+        ctx.closePath();
+        ctx.fill();
+        ctx.rotate(Math.PI / 4);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function drawRings(now) {
+    rings = rings.filter(r => now - r.born < r.life);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const r of rings) {
+      const k = (now - r.born) / r.life;
+      ctx.strokeStyle = `rgba(${r.rgb},${0.8 * (1 - k)})`;
+      ctx.lineWidth = r.width * (1 - k) + 0.5;
+      ctx.beginPath();
+      ctx.ellipse(r.x, r.y, lerp(r.r0, r.r1, easeOut(k)), lerp(r.r0, r.r1, easeOut(k)) * r.squash, 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawParticles(now, dt) {
+    particles = particles.filter(p => now - p.born < p.life);
+    for (const p of particles) {
+      p.vy += p.g * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (p.kind === 'blood' && p.y > GROUND_Y + 2) {
+        p.y = GROUND_Y + 2;
+        p.vx = 0;
+        p.vy = 0;
+        p.g = 0;
+      }
+      const a = 1 - (now - p.born) / p.life;
+      if (p.kind === 'spark') {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.size;
+        line(p.x, p.y, p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+        ctx.restore();
+      } else {
+        ctx.globalAlpha = p.kind === 'blood' ? Math.min(1, a * 2) : a;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        if (p.kind === 'blood' && p.g === 0) ctx.ellipse(p.x, p.y, p.size * 1.8, p.size * 0.5, 0, 0, TAU);
+        else ctx.arc(p.x, p.y, p.kind === 'smoke' ? p.size * (1.6 - a * 0.6) : p.size, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawScreenFx(now, rnow) {
+    screenFlashes = screenFlashes.filter(f => rnow - f.start < f.dur);
+    for (const f of screenFlashes) {
+      ctx.fillStyle = `rgba(${f.rgb},${f.alpha * (1 - (rnow - f.start) / f.dur)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    const vignette = (rgb, a, inner = 220) => {
+      const v = ctx.createRadialGradient(W / 2, H / 2, inner, W / 2, H / 2, 580);
+      v.addColorStop(0, `rgba(${rgb},0)`);
+      v.addColorStop(1, `rgba(${rgb},${a})`);
+      ctx.fillStyle = v;
+      ctx.fillRect(0, 0, W, H);
+    };
+    vignette('0,0,0', 0.55, 300);
+    if (cueFx && cueFx.type === 'red') {
+      const k = (now - cueFx.at) / 320;
+      if (k >= 0 && k <= 1) vignette('255,0,0', 0.4 * (1 - k));
+    }
+    if (cueFx && cueFx.type === 'black') {
+      const k = (now - cueFx.at) / 320;
+      if (k >= 0 && k <= 1) vignette('40,10,70', 0.6 * (1 - k));
+    }
+    if (clock.scale > 0 && clock.scale < 1) vignette('5,5,10', 0.5, 160);
+    if (player.hp > 0 && player.hp < 30) vignette('150,0,0', 0.25 + 0.15 * Math.sin(rnow / 200), 260);
+  }
+
+  // ---------- HUD ----------
+  function drawBar(x, y, w, h, ratio, lag, color, glow) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = '#1e1e23';
+    ctx.fillRect(x, y, w, h);
+    if (lag != null && lag > ratio) {
+      ctx.fillStyle = '#a3161c';
+      ctx.fillRect(x, y, w * clamp(lag, 0, 1), h);
+    }
+    ctx.save();
+    if (glow) {
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 12;
+    }
+    const gr = ctx.createLinearGradient(x, y, x, y + h);
+    gr.addColorStop(0, color[0]);
+    gr.addColorStop(1, color[1]);
+    ctx.fillStyle = gr;
+    ctx.fillRect(x, y, w * clamp(ratio, 0, 1), h);
+    ctx.restore();
+  }
+
+  function drawShaBar(x, y, w, h, sha, broken, rnow, label) {
+    const full = sha >= CFG.playerSha - 0.01;
+    const col = broken
+      ? (Math.sin(rnow / 70) > 0 ? ['#ff6a5a', '#a3161c'] : ['#7a1a1a', '#4a0a0a'])
+      : ['#f2c95a', '#b8862a'];
+    drawBar(x, y, w, h, sha / CFG.playerSha, null, col, full && !broken ? 'rgba(255,200,90,0.8)' : null);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    for (let i = 1; i < 5; i++) ctx.fillRect(x + w * i / 5 - 1, y, 2, h);
+    if (label) {
+      ctx.fillStyle = '#b8a77a';
+      ctx.font = `12px ${UI}`;
+      ctx.fillText(label, x + w + 8, y + h);
+    }
+  }
+
+  function drawHUD(now, rnow, dtReal) {
+    player.hpLag = Math.max(player.hp, player.hpLag - 40 * dtReal);
+    enemy.hpLag = Math.max(enemy.hp, enemy.hpLag - 60 * dtReal);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ece4d4';
+    ctx.font = `26px ${KAI}`;
+    ctx.fillText('魂', 34, 52);
+    drawBar(70, 36, 280, 9, player.hp / CFG.playerHP, player.hpLag / CFG.playerHP, ['#f4eee2', '#b9b2a5']);
+    drawShaBar(70, 52, 280, 6, player.sha, isBroken(now), rnow, guardHeld(now) ? '架势' : '');
+
+    const cd = player.switchReadyAt - now;
+    for (let i = 0; i < 2; i++) {
+      const cx = 78 + i * 22, cy = 78;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.PI / 4);
+      ctx.strokeStyle = '#b8a77a';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-6, -6, 12, 12);
+      if (player.weapon === i) {
+        ctx.fillStyle = '#d9a64a';
+        ctx.fillRect(-4, -4, 8, 8);
+      }
+      ctx.restore();
+    }
+    ctx.font = `12px ${UI}`;
+    ctx.fillStyle = cd > 0 ? '#8d877e' : '#d9c48a';
+    ctx.fillText(cd > 0 ? `换刃冷却 ${(cd / 1000).toFixed(1)}s` : '换刃就绪', 126, 82);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ece4d4';
+    ctx.font = `26px ${KAI}`;
+    ctx.fillText('叶师傅', 926, 52);
+    drawBar(590, 36, 280, 9, enemy.hp / CFG.enemyHP, enemy.hpLag / CFG.enemyHP, ['#f4eee2', '#b9b2a5']);
+    drawShaBar(590, 52, 280, 6, enemy.sha, enemy.mode === 'broken', rnow, '');
+    if (enemy.mode === 'broken') {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffcf5a';
+      ctx.font = `13px ${UI}`;
+      ctx.fillText(`破防 ${Math.max(0, (enemy.brokenUntil - now) / 1000).toFixed(1)}s`, 870, 80);
+    }
+
+    if (enemy.mode === 'broken') {
+      const pulse = 0.75 + 0.25 * Math.sin(rnow / 120);
+      const x = ENEMY_X, y = GROUND_Y - 250;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#ffcf5a';
+      ctx.lineWidth = 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.beginPath();
+      ctx.roundRect(x - 16, y - 16, 32, 32, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#ffcf5a';
+      ctx.textAlign = 'center';
+      ctx.font = `bold 18px ${UI}`;
+      ctx.fillText('E', x, y + 6);
+      ctx.font = `20px ${KAI}`;
+      ctx.fillText('处决', x, y + 42);
+      ctx.restore();
+    }
+
+    ctx.textAlign = 'center';
+    ctx.font = `12px ${UI}`;
+    ctx.fillStyle = '#6f6a63';
+    ctx.fillText(`${diff.name} · 弹反窗口 ${Math.round(perfectWindow())}ms`, W / 2, H - 14);
+  }
+
+  function drawBanner(rnow) {
+    if (!banner) return;
+    const age = rnow - banner.born;
+    const k = age / 1100;
+    if (k > 1) { banner = null; return; }
+    const appear = Math.min(1, age / 110);
+    const scale = 1.25 - 0.25 * easeOut(appear);
+    const alpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+    ctx.save();
+    ctx.translate(W / 2, 160);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = alpha;
+    ctx.font = `40px ${KAI}`;
+    const tw = ctx.measureText(banner.text).width;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(-tw / 2 - 56, -6);
+    ctx.quadraticCurveTo(-tw / 2 - 20, -36, 0, -32);
+    ctx.quadraticCurveTo(tw / 2 + 30, -30, tw / 2 + 64, -14);
+    ctx.quadraticCurveTo(tw / 2 + 36, banner.sub ? 40 : 22, 0, banner.sub ? 36 : 20);
+    ctx.quadraticCurveTo(-tw / 2 - 34, banner.sub ? 40 : 24, -tw / 2 - 56, -6);
+    ctx.fill();
+    ctx.textAlign = 'center';
+    ctx.shadowColor = banner.color;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = banner.color;
+    ctx.fillText(banner.text, 0, 6);
+    ctx.shadowBlur = 0;
+    if (banner.sub) {
+      ctx.font = `14px ${UI}`;
+      ctx.fillStyle = '#cfc8bd';
+      ctx.fillText(banner.sub, 0, 30);
+    }
+    ctx.restore();
+  }
+
+  function drawTexts(rnow) {
+    ctx.textAlign = 'center';
+    texts = texts.filter(t => rnow - t.born < t.life);
+    for (const t of texts) {
+      const k = (rnow - t.born) / t.life;
+      ctx.globalAlpha = 1 - k;
+      ctx.fillStyle = t.color;
+      ctx.font = `${t.size}px ${KAI}`;
+      ctx.fillText(t.text, t.x, t.y - 30 * k);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- 渲染 ----------
+  function resetT() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function render(now, rnow, dt, dtReal) {
+    resetT();
+    ctx.drawImage(bgCanvas, 0, 0, W, H);
+    drawAtmosphere(rnow, dtReal);
+    if (!player) {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(0, 0, W, H);
+      return;
+    }
+
+    const sh = currentShake(rnow);
+    const zk = (rnow - cam.zoomStart) / 380;
+    const z = 1 + (zk < 1 ? cam.zoom * (1 - easeOut(zk)) : 0);
+    ctx.translate(W / 2, 300);
+    ctx.scale(z, z);
+    ctx.translate(-W / 2, -300);
+    ctx.translate(rand(-sh, sh), rand(-sh, sh));
+
+    drawCueFx(now);
+
+    const ep = enemyPose(now, rnow);
+    drawTrail(trails.enemy, now);
+    enemyGeom = drawFighter(ep, rnow);
+    if (ep.swinging) sampleTrail(trails.enemy, enemyGeom, now, enemy.hit ? ATTACK[enemy.hit.type].rgb : '235,235,235');
+
+    const pp = playerPose(now, rnow);
+    if (pp.invuln) {
+      for (let i = 1; i <= 2; i++) {
+        drawFighter({ ...pp, x: pp.x + pp.f * 22 * i, alpha: 0.18 / i, rim: '#5aa0ff', scarf: false }, rnow);
+      }
+    }
+    drawTrail(trails.player, now);
+    const pg = drawFighter(pp, rnow);
+    if (pp.swinging) {
+      const kind = player.attack && player.attack.kind;
+      sampleTrail(trails.player, pg, now, kind === 'heavy' ? '80,170,255' : kind === 'exec' ? '255,70,50' : '200,215,235');
+    }
+
+    drawGlints(now);
+    drawRings(now);
+    drawParticles(now, dt);
+
+    resetT();
+    drawScreenFx(now, rnow);
+    drawHUD(now, rnow, dtReal);
+    drawBanner(rnow);
+    drawTexts(rnow);
+
+    if (state === 'pause') {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ece4d4';
+      ctx.font = `48px ${KAI}`;
+      ctx.fillText('暂 停', W / 2, 260);
+      ctx.font = `14px ${UI}`;
+      ctx.fillStyle = '#8d877e';
+      ctx.fillText('按 Esc / Options 继续', W / 2, 296);
+    }
+  }
+
+  // ---------- 主循环 ----------
+  function updatePlayer(now, dt) {
+    if (player.broken && now >= player.brokenUntil) {
+      player.broken = false;
+      player.sha = Math.max(player.sha, CFG.playerBreakRecoverSha);
+    }
+    if (player.behind && now >= player.behindUntil) {
+      player.behind = false;
+      spawnSmoke(BEHIND_X, GROUND_Y - 90, 16);
+      spawnSmoke(PLAYER_X, GROUND_Y - 90, 16);
+      Sfx.ghostReturn();
+    }
+    if (player.guardDown && guardHeld(now)) {
+      changePlayerSha(-CFG.guardDrainPerSec * dt, now);
+    }
+    if (player.pendingLate && now - player.pendingLate.impactAt > CFG.lateWindow) {
+      player.pendingLate = null;
+    }
+  }
+
+  let lastReal = performance.now(), lastGame = gameNow();
+  function loop() {
+    updateTimeScale();
+    pollGamepad();
+    const rnow = performance.now();
+    const dtReal = Math.min(0.05, (rnow - lastReal) / 1000);
+    lastReal = rnow;
+    const now = gameNow();
+    const dt = Math.min(0.05, Math.max(0, (now - lastGame) / 1000));
+    lastGame = now;
+    if (state === 'play') {
+      updatePlayer(now, dt);
+      updateEnemy(now);
+    }
+    if (state === 'ending' && rnow >= endInfo.at) {
+      state = 'over';
+      showResult(endInfo.win);
+    }
+    render(gameNow(), rnow, dt, dtReal);
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- 键鼠 ----------
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('contextmenu', e => { if (state === 'play') e.preventDefault(); });
+
+  window.addEventListener('mousedown', e => {
+    Sfx.init();
+    if (state !== 'play') return;
+    const t = gameNow();
+    if (e.button === 2) { e.preventDefault(); pressGuard(t); }
+    else if (e.button === 0 && e.target === canvas) lightAttack(t);
+  });
+  window.addEventListener('mouseup', e => {
+    if (e.button === 2 && state === 'play') releaseGuard(gameNow());
+  });
+
+  window.addEventListener('keydown', e => {
+    Sfx.init();
+    if (e.code === 'Escape') { togglePause(); return; }
+    if (state === 'menu' || state === 'over') {
+      if (e.code === 'Enter') startGame();
+      return;
+    }
+    if (state !== 'play' || e.repeat) return;
+    const t = gameNow();
+    switch (e.code) {
+      case 'ShiftLeft':
+      case 'ShiftRight': pressDodge(t); break;
+      case 'KeyF': heavyAttack(t); break;
+      case 'KeyE': execute(t); break;
+      case 'Digit1': switchWeapon(t); break;
+    }
+  });
+
+  window.addEventListener('blur', () => { if (state === 'play') releaseGuard(gameNow()); });
+
+  volEl.addEventListener('input', () => {
+    Sfx.init();
+    Sfx.setVolume(volEl.value / 100);
+  });
+  let muted = false;
+  muteEl.addEventListener('click', () => {
+    Sfx.init();
+    muted = !muted;
+    Sfx.setMuted(muted);
+    muteEl.textContent = muted ? '已静音' : '静音';
+    muteEl.classList.toggle('on', muted);
+  });
+
+  // ---------- 手柄 ----------
+  const prevPad = [];
+  function pollGamepad() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let gp = null;
+    for (const p of pads) if (p && p.connected) { gp = p; break; }
+    if (!gp) return;
+    const t = gameNow();
+    const down = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    const edge = i => down(i) && !prevPad[i];
+    const up = i => !down(i) && prevPad[i];
+
+    if (edge(9)) togglePause();
+    if (state === 'menu' || state === 'over') {
+      if (edge(14)) { diffIdx = (diffIdx + DIFFICULTIES.length - 1) % DIFFICULTIES.length; updateDiffSel(); }
+      if (edge(15)) { diffIdx = (diffIdx + 1) % DIFFICULTIES.length; updateDiffSel(); }
+      if (edge(0)) startGame();
+    } else if (state === 'play') {
+      if (edge(4)) pressGuard(t);
+      if (up(4)) releaseGuard(t);
+      if (edge(5)) pressDodge(t);
+      if (edge(2)) lightAttack(t);
+      if (edge(3)) heavyAttack(t);
+      if (edge(1)) execute(t);
+      if (edge(14)) switchWeapon(t);
+    }
+    for (let i = 0; i < gp.buttons.length; i++) prevPad[i] = down(i);
+  }
+
+  buildBackground();
+  showMenu();
+  renderSide();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
