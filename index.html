@@ -29,10 +29,16 @@
     justify-content: center;
     align-items: flex-start;
   }
-  #stage {
-    position: relative;
+  #main {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     width: 960px;
     max-width: calc(100vw - 400px);
+  }
+  #stage {
+    position: relative;
+    width: 100%;
     aspect-ratio: 16 / 9;
     overflow: hidden;
     box-shadow: 0 0 0 1px #2c2c33, 0 24px 70px rgba(0, 0, 0, 0.7);
@@ -161,8 +167,21 @@
   #statsExtra div { padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid #24242a; }
   #statsExtra b { display: block; font-family: var(--kai); font-size: 20px; font-weight: normal; color: var(--paper); }
   #statsExtra small { font-size: 11px; color: var(--muted); }
-  #log { margin: 0; padding: 0; list-style: none; max-height: 250px; overflow-y: auto; font-size: 12px; line-height: 1.5; }
-  #log li { padding: 4px 0 4px 8px; margin-bottom: 3px; border-left: 3px solid var(--c); background: rgba(255, 255, 255, 0.02); }
+  #log {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 4px;
+    align-content: start;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-height: 40px;
+    max-height: 190px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  #log li { padding: 4px 0 4px 8px; border-left: 3px solid var(--c); background: rgba(255, 255, 255, 0.02); }
   #log .perfect .r { color: #ffcf5a; }
   #log .ok .r { color: #9fd89a; }
   #log .fail .r { color: #ff7a7a; }
@@ -179,16 +198,22 @@
   }
   @media (max-width: 1100px) {
     #app { flex-direction: column; align-items: center; }
-    #stage { max-width: calc(100vw - 36px); }
+    #main { max-width: calc(100vw - 36px); }
     aside { width: min(960px, calc(100vw - 36px)); }
   }
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="stage">
-    <canvas id="game"></canvas>
-    <div id="overlay"></div>
+  <div id="main">
+    <div id="stage">
+      <canvas id="game"></canvas>
+      <div id="overlay"></div>
+    </div>
+    <section class="panel">
+      <h3>判定记录</h3>
+      <ol id="log"></ol>
+    </section>
   </div>
   <aside>
     <section class="panel">
@@ -206,10 +231,6 @@
         <span style="--c:#ffcf5a">完美</span><span style="--c:#7fc77a">成功</span><span style="--c:#d9534f">失误</span>
       </div>
       <div id="statsExtra"></div>
-    </section>
-    <section class="panel">
-      <h3>判定记录</h3>
-      <ol id="log"></ol>
     </section>
     <section class="panel" id="keys">
       <h3>按键</h3>
@@ -1970,13 +1991,14 @@
     ctx.fillStyle = '#ece4d4';
     ctx.font = `26px ${KAI}`;
     ctx.fillText('叶师傅', 926, 52);
-    drawBar(590, 36, 280, 9, enemy.hp / CFG.enemyHP, enemy.hpLag / CFG.enemyHP, ['#f4eee2', '#b9b2a5']);
-    drawShaBar(590, 52, 280, 6, enemy.sha, enemy.mode === 'broken', rnow, '');
+    const barEnd = 926 - ctx.measureText('叶师傅').width - 14;
+    drawBar(barEnd - 280, 36, 280, 9, enemy.hp / CFG.enemyHP, enemy.hpLag / CFG.enemyHP, ['#f4eee2', '#b9b2a5']);
+    drawShaBar(barEnd - 280, 52, 280, 6, enemy.sha, enemy.mode === 'broken', rnow, '');
     if (enemy.mode === 'broken') {
       ctx.textAlign = 'right';
       ctx.fillStyle = '#ffcf5a';
       ctx.font = `13px ${UI}`;
-      ctx.fillText(`破防 ${Math.max(0, (enemy.brokenUntil - now) / 1000).toFixed(1)}s`, 870, 80);
+      ctx.fillText(`破防 ${Math.max(0, (enemy.brokenUntil - now) / 1000).toFixed(1)}s`, barEnd, 80);
     }
 
     if (enemy.mode === 'broken') {
